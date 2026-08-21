@@ -31,11 +31,17 @@ import type {
 function App() {
 
   const [
-    profile,
-    setProfile,
-  ] = useState<StudentProfile>(
-    demoProfile
-  );
+  profile,
+  setProfile,
+] = useState<StudentProfile>({
+  name: "Sivakarthik",
+  year: 2,
+  branch: "Computer Science Engineering",
+  location: "Bangalore, India",
+  interests: ["Artificial Intelligence", "Web Development"],
+  skills: ["Python", "FastAPI", "React", "SQL"],
+  opportunity_type: "internship"
+});
 
 
   const [

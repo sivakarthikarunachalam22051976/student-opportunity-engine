@@ -5,44 +5,69 @@ import type {
 } from "./types";
 
 
+// ============================================================
+// API BASE URL
+// ============================================================
+
 const API =
   window.location.hostname === "localhost" ||
   window.location.hostname === "127.0.0.1"
     ? "http://127.0.0.1:8000"
-    : "YOUR_RENDER_BACKEND_URL_HERE";
+    : "https://student-opportunity-engine.onrender.com";
 
+
+// ============================================================
+// HELPER
+// ============================================================
+
+async function getErrorMessage(response: Response): Promise<string> {
+  try {
+    const data = await response.json();
+
+    if (typeof data?.detail === "string") {
+      return data.detail;
+    }
+
+    return JSON.stringify(data);
+  } catch {
+    return response.statusText || "Unknown backend error";
+  }
+}
+
+
+// ============================================================
+// OPPORTUNITIES
+// ============================================================
 
 export async function getOpportunities(): Promise<Opportunity[]> {
-
   const response = await fetch(
     `${API}/api/opportunities`
   );
 
-
   if (!response.ok) {
     throw new Error(
-      "Failed to fetch opportunities"
+      `Failed to fetch opportunities: ${await getErrorMessage(response)}`
     );
   }
-
 
   return response.json();
 }
 
 
-export async function getStudentProfile(): Promise<StudentProfile> {
+// ============================================================
+// STUDENT PROFILE
+// ============================================================
 
+export async function getStudentProfile(): Promise<StudentProfile> {
   const response = await fetch(
     `${API}/api/student`
   );
 
-
   if (!response.ok) {
     throw new Error(
-      "Failed to fetch student profile"
+      `Failed to fetch student profile: ${await getErrorMessage(response)}`
     );
   }
-
 
   return response.json();
 }
@@ -65,17 +90,27 @@ export async function saveStudentProfile(
     }
   );
 
-
   if (!response.ok) {
     throw new Error(
-      "Failed to save student profile"
+      `Failed to save student profile: ${await getErrorMessage(response)}`
     );
   }
 
+  const data = await response.json();
 
-  return response.json();
+  // Backend returns:
+  // {
+  //   message: "...",
+  //   student: {...}
+  // }
+
+  return data.student;
 }
 
+
+// ============================================================
+// LIVE AI SEARCH
+// ============================================================
 
 export async function searchOpportunities(
   profile: StudentProfile
@@ -89,16 +124,13 @@ export async function searchOpportunities(
     profile
   );
 
-
   const response = await fetch(
     `${API}/api/ai/search-opportunities`
   );
 
-
   if (!response.ok) {
-
     const errorText =
-      await response.text();
+      await getErrorMessage(response);
 
     console.error(
       "Search API error:",
@@ -107,14 +139,17 @@ export async function searchOpportunities(
     );
 
     throw new Error(
-      `Failed to search opportunities: ${response.status}`
+      `Failed to search opportunities: ${errorText}`
     );
   }
-
 
   return response.json();
 }
 
+
+// ============================================================
+// BASIC MATCH
+// ============================================================
 
 export async function getMatch(
   id: number
@@ -124,17 +159,19 @@ export async function getMatch(
     `${API}/api/match/${id}`
   );
 
-
   if (!response.ok) {
     throw new Error(
-      "Failed to fetch match"
+      `Failed to fetch match: ${await getErrorMessage(response)}`
     );
   }
-
 
   return response.json();
 }
 
+
+// ============================================================
+// ELIGIBILITY
+// ============================================================
 
 export async function getEligibility(
   id: number
@@ -144,17 +181,41 @@ export async function getEligibility(
     `${API}/api/eligibility/${id}`
   );
 
-
   if (!response.ok) {
     throw new Error(
-      "Failed to fetch eligibility"
+      `Failed to fetch eligibility: ${await getErrorMessage(response)}`
     );
   }
-
 
   return response.json();
 }
 
+
+// ============================================================
+// SEMANTIC MATCH
+// ============================================================
+
+export async function getSemanticMatch(
+  id: number
+) {
+
+  const response = await fetch(
+    `${API}/api/semantic-match/${id}`
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch semantic match: ${await getErrorMessage(response)}`
+    );
+  }
+
+  return response.json();
+}
+
+
+// ============================================================
+// GAP ANALYSIS
+// ============================================================
 
 export async function getGaps(
   id: number
@@ -164,33 +225,33 @@ export async function getGaps(
     `${API}/api/gap_analysis/${id}`
   );
 
-
   if (!response.ok) {
     throw new Error(
-      "Failed to fetch skill gaps"
+      `Failed to fetch skill gaps: ${await getErrorMessage(response)}`
     );
   }
-
 
   return response.json();
 }
 
+
+// ============================================================
+// RESOURCE ROADMAP
+// ============================================================
 
 export async function getPreparation(
   id: number
 ) {
 
   const response = await fetch(
-    `${API}/api/prepare/${id}`
+    `${API}/api/resource-roadmap/${id}`
   );
-
 
   if (!response.ok) {
     throw new Error(
-      "Failed to fetch preparation plan"
+      `Failed to fetch preparation plan: ${await getErrorMessage(response)}`
     );
   }
-
 
   return response.json();
 }

@@ -3,39 +3,81 @@
     "id": 1,
     "title": "AI Research Internship",
     "organization": "Example AI Labs",
+    "description": "Research internship focused on machine learning and artificial intelligence projects.",
     "year": ["2nd", "3rd", "4th"],
-    "branches": ["Computer Science", "Artificial Intelligence", "Data Science"],
-    "skills": ["Python", "Machine Learning"],
+    "branches": [
+      "Computer Science",
+      "Computer Science Engineering",
+      "Artificial Intelligence",
+      "Data Science"
+    ],
+    "skills": [
+      "Python",
+      "Machine Learning"
+    ],
     "location": "India",
     "remote": true,
     "deadline": "2026-08-28",
     "stipend": 30000,
-    "documents": ["Resume", "GitHub Portfolio"]
+    "documents": [
+      "Resume",
+      "GitHub Portfolio"
+    ],
+    "source_url": null,
+    "application_url": null,
+    "verification_score": "Low"
   },
   {
     "id": 2,
     "title": "Software Engineering Internship",
     "organization": "Example Software",
+    "description": "Software engineering internship for students interested in backend and application development.",
     "year": ["1st", "2nd", "3rd", "4th"],
-    "branches": ["Computer Science", "Information Technology"],
-    "skills": ["Python", "Java", "Git"],
+    "branches": [
+      "Computer Science",
+      "Computer Science Engineering",
+      "Information Technology"
+    ],
+    "skills": [
+      "Python",
+      "Java",
+      "Git"
+    ],
     "location": "India",
     "remote": false,
     "deadline": "2026-09-05",
     "stipend": 20000,
-    "documents": ["Resume"]
+    "documents": [
+      "Resume"
+    ],
+    "source_url": null,
+    "application_url": null,
+    "verification_score": "Low"
   },
   {
     "id": 3,
     "title": "Machine Learning Hackathon",
     "organization": "Example Tech",
+    "description": "Student hackathon focused on building practical machine learning solutions.",
     "year": ["1st", "2nd", "3rd", "4th"],
-    "branches": ["Computer Science", "Artificial Intelligence"],
-    "skills": ["Python", "Machine Learning"],
+    "branches": [
+      "Computer Science",
+      "Computer Science Engineering",
+      "Artificial Intelligence"
+    ],
+    "skills": [
+      "Python",
+      "Machine Learning"
+    ],
     "location": "India",
     "remote": true,
     "deadline": "2026-09-12",
     "stipend": null,
-    "documents": ["Registration Form"]
+    "documents": [
+      "Registration Form"
+    ],
+    "source_url": null,
+    "application_url": null,
+    "verification_score": "Low"
   }
 ]
