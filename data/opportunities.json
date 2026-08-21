@@ -1,0 +1,41 @@
+[
+  {
+    "id": 1,
+    "title": "AI Research Internship",
+    "organization": "Example AI Labs",
+    "year": ["2nd", "3rd", "4th"],
+    "branches": ["Computer Science", "Artificial Intelligence", "Data Science"],
+    "skills": ["Python", "Machine Learning"],
+    "location": "India",
+    "remote": true,
+    "deadline": "2026-08-28",
+    "stipend": 30000,
+    "documents": ["Resume", "GitHub Portfolio"]
+  },
+  {
+    "id": 2,
+    "title": "Software Engineering Internship",
+    "organization": "Example Software",
+    "year": ["1st", "2nd", "3rd", "4th"],
+    "branches": ["Computer Science", "Information Technology"],
+    "skills": ["Python", "Java", "Git"],
+    "location": "India",
+    "remote": false,
+    "deadline": "2026-09-05",
+    "stipend": 20000,
+    "documents": ["Resume"]
+  },
+  {
+    "id": 3,
+    "title": "Machine Learning Hackathon",
+    "organization": "Example Tech",
+    "year": ["1st", "2nd", "3rd", "4th"],
+    "branches": ["Computer Science", "Artificial Intelligence"],
+    "skills": ["Python", "Machine Learning"],
+    "location": "India",
+    "remote": true,
+    "deadline": "2026-09-12",
+    "stipend": null,
+    "documents": ["Registration Form"]
+  }
+]
