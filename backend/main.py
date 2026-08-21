@@ -15,46 +15,46 @@ from pydantic import (
     Field
 )
 
-from student import student_profile
+from .student import student_profile
 
-from eligibility import (
+from .eligibility import (
     check_eligibility
 )
 
-from matching import (
+from .matching import (
     calculate_match
 )
 
-from gap_analysis import (
+from .gap_analysis import (
     find_skill_gaps
 )
 
-from semantic_matching import (
+from .semantic_matching import (
     get_semantic_skill_match
 )
 
-from resource_roadmap import (
+from .resource_roadmap import (
     create_resource_roadmap
 )
 
-from resume_parser import (
+from .resume_parser import (
     parse_resume_text
 )
 
-from skill_normalizer import (
+from .skill_normalizer import (
     normalize_skills
 )
 
-from live_opportunities import (
+from .live_opportunities import (
     save_live_opportunities,
     get_all_live_opportunities
 )
 
-from ai.opportunity_parser import (
+from .ai.opportunity_parser import (
     parse_opportunity_text
 )
 
-from ai.web_search import (
+from .ai.web_search import (
     search_real_opportunities
 )
 
