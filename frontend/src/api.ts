@@ -5,10 +5,12 @@ import type {
 } from "./types";
 
 
+const API =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1"
+    ? "http://127.0.0.1:8000"
+    : "YOUR_RENDER_BACKEND_URL_HERE";
 
-const API = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-  ? "http://127.0.0.1:8000"                                    // Use this when testing on your laptop
-  : "https://onrender.com";
 
 export async function getOpportunities(): Promise<Opportunity[]> {
 
@@ -25,7 +27,6 @@ export async function getOpportunities(): Promise<Opportunity[]> {
 
 
   return response.json();
-
 }
 
 
@@ -44,7 +45,6 @@ export async function getStudentProfile(): Promise<StudentProfile> {
 
 
   return response.json();
-
 }
 
 
@@ -74,7 +74,6 @@ export async function saveStudentProfile(
 
 
   return response.json();
-
 }
 
 
@@ -85,29 +84,35 @@ export async function searchOpportunities(
   count: number;
 }> {
 
+  console.log(
+    "Current student profile:",
+    profile
+  );
+
+
   const response = await fetch(
-    `${API}/api/ai/search-opportunities`,
-    {
-      method: "POST",
-
-      headers: {
-        "Content-Type": "application/json",
-      },
-
-      body: JSON.stringify(profile),
-    }
+    `${API}/api/ai/search-opportunities`
   );
 
 
   if (!response.ok) {
+
+    const errorText =
+      await response.text();
+
+    console.error(
+      "Search API error:",
+      response.status,
+      errorText
+    );
+
     throw new Error(
-      "Failed to search opportunities"
+      `Failed to search opportunities: ${response.status}`
     );
   }
 
 
   return response.json();
-
 }
 
 
@@ -128,7 +133,6 @@ export async function getMatch(
 
 
   return response.json();
-
 }
 
 
@@ -149,7 +153,6 @@ export async function getEligibility(
 
 
   return response.json();
-
 }
 
 
@@ -170,7 +173,6 @@ export async function getGaps(
 
 
   return response.json();
-
 }
 
 
@@ -191,5 +193,4 @@ export async function getPreparation(
 
 
   return response.json();
-
 }
