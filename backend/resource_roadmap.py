@@ -1,8 +1,8 @@
-from resource_catalog import (
+from .resource_catalog import (
     LEARNING_RESOURCES
 )
 
-from skill_normalizer import (
+from .skill_normalizer import (
     normalize_skill,
     normalize_skills
 )

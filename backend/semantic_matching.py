@@ -1,4 +1,4 @@
-from skill_normalizer import normalize_skill, normalize_skills
+from .skill_normalizer import normalize_skill, normalize_skills
 
 
 RELATED_SKILLS = {

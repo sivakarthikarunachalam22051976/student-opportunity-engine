@@ -1,6 +1,6 @@
 import re
 
-from skill_normalizer import (
+from .skill_normalizer import (
     normalize_skills
 )
 
