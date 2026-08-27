@@ -1,84 +1,82 @@
-def create_learning_plan(missing_skills):
-    plan = []
+from .ai.learning_roadmap import (
+    create_ai_learning_roadmap,
+)
 
-    for skill in missing_skills:
-        skill_clean = skill.strip()
+from .gap_analysis import (
+    find_skill_gaps,
+)
 
-        if skill_clean.lower() == "machine learning":
-            plan.append(
-                {
-                    "skill": "Machine Learning",
-                    "steps": [
-                        "Learn supervised learning",
-                        "Learn classification and regression",
-                        "Learn model evaluation",
-                        "Build one beginner ML project",
-                    ],
-                }
+from .resource_roadmap import (
+    create_resource_roadmap,
+)
+
+
+def build_preparation_plan(
+    student,
+    opportunity,
+):
+    gaps = find_skill_gaps(
+        student.get(
+            "skills",
+            [],
+        ),
+
+        opportunity.get(
+            "skills",
+            [],
+        ),
+    )
+
+    missing_skills = (
+        gaps.get(
+            "missing_skills",
+            [],
+        )
+    )
+
+    ai_roadmap = (
+        create_ai_learning_roadmap(
+            missing_skills,
+            opportunity.get(
+                "deadline"
+            ),
+        )
+    )
+
+    if ai_roadmap:
+        roadmap = ai_roadmap
+        engine = "AI"
+    else:
+        roadmap = (
+            create_resource_roadmap(
+                missing_skills,
+                opportunity.get(
+                    "skills",
+                    [],
+                ),
             )
+        )
 
-        elif skill_clean.lower() == "git":
-            plan.append(
-                {
-                    "skill": "Git",
-                    "steps": [
-                        "Learn Git basics",
-                        "Create a GitHub repository",
-                        "Practice commits and branches",
-                        "Upload a project",
-                    ],
-                }
-            )
+        engine = "Rule-based fallback"
 
-        elif skill_clean.lower() == "tensorflow":
-            plan.append(
-                {
-                    "skill": "TensorFlow",
-                    "steps": [
-                        "Learn TensorFlow basics",
-                        "Build a simple neural network",
-                        "Train a small model",
-                        "Document the project",
-                    ],
-                }
-            )
+    return {
+        "opportunity":
+            opportunity.get(
+                "title"
+            ),
 
-        elif skill_clean.lower() == "python":
-            plan.append(
-                {
-                    "skill": "Python",
-                    "steps": [
-                        "Learn Python fundamentals",
-                        "Practice functions and data structures",
-                        "Work with files and APIs",
-                        "Build a small Python project",
-                    ],
-                }
-            )
+        "readiness_percentage":
+            gaps.get(
+                "readiness_percentage",
+                0,
+            ),
 
-        elif skill_clean.lower() == "java":
-            plan.append(
-                {
-                    "skill": "Java",
-                    "steps": [
-                        "Learn Java fundamentals",
-                        "Practice object-oriented programming",
-                        "Work with collections",
-                        "Build a small Java project",
-                    ],
-                }
-            )
+        "missing_skills":
+            missing_skills,
 
-        else:
-            plan.append(
-                {
-                    "skill": skill_clean,
-                    "steps": [
-                        f"Learn {skill_clean} fundamentals",
-                        f"Practice {skill_clean}",
-                        f"Build a small {skill_clean} project",
-                    ],
-                }
-            )
+        "roadmap":
+            roadmap,
 
-    return plan
+        "engine":
+            engine,
+    }

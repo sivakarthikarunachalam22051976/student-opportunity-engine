@@ -1,9 +1,43 @@
-from google.genai import types
-
-from ai.client import (
-    client,
-    GEMINI_MODEL,
+from .client import (
+    ai_available,
+    generate_json,
 )
+
+
+GAP_SCHEMA = {
+    "type": "object",
+
+    "properties": {
+        "matched_skills": {
+            "type": "array",
+            "items": {
+                "type": "string",
+            },
+        },
+
+        "missing_skills": {
+            "type": "array",
+            "items": {
+                "type": "string",
+            },
+        },
+
+        "priority_skills": {
+            "type": "array",
+            "items": {
+                "type": "string",
+            },
+        },
+    },
+
+    "required": [
+        "matched_skills",
+        "missing_skills",
+        "priority_skills",
+    ],
+
+    "additionalProperties": False,
+}
 
 
 def analyze_skill_gap(
@@ -25,73 +59,32 @@ def analyze_skill_gap(
             "priority_skills": [],
         }
 
-    prompt = f"""
-Compare student skills with opportunity
-requirements.
+    if ai_available():
+        try:
+            return generate_json(
+                system_prompt=(
+                    "Compare skills carefully. "
+                    "Do not invent skills."
+                ),
 
+                user_prompt=f"""
 Student skills:
-
 {student_skills}
 
 Required skills:
-
 {required_skills}
+""",
 
-Return ONLY valid JSON:
+                schema_name="skill_gap",
 
-{{
-    "matched_skills": [],
-    "missing_skills": [],
-    "priority_skills": []
-}}
+                schema=GAP_SCHEMA,
+            )
 
-Rules:
-
-- Do not invent skills.
-- Every missing skill must come
-  from the required skills.
-- priority_skills must come
-  from missing_skills.
-- Return JSON only.
-"""
-
-    try:
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=0,
-                response_mime_type="application/json",
-            ),
-        )
-
-        data = response.parsed
-
-        if isinstance(data, dict):
-            return {
-                "matched_skills":
-                    data.get(
-                        "matched_skills",
-                        []
-                    ),
-
-                "missing_skills":
-                    data.get(
-                        "missing_skills",
-                        []
-                    ),
-
-                "priority_skills":
-                    data.get(
-                        "priority_skills",
-                        []
-                    ),
-            }
-
-    except Exception as error:
-        print(
-            f"AI gap analysis failed: {error}"
-        )
+        except Exception as error:
+            print(
+                f"AI gap analysis fallback: "
+                f"{error}"
+            )
 
     student_set = {
         str(skill).strip().lower()
@@ -102,7 +95,10 @@ Rules:
     missing = []
 
     for skill in required_skills:
-        if str(skill).strip().lower() in student_set:
+        if (
+            str(skill).strip().lower()
+            in student_set
+        ):
             matched.append(skill)
         else:
             missing.append(skill)

@@ -3,42 +3,65 @@ import json
 import os
 import re
 
+from urllib.parse import urlparse
+
 import requests
 
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
-from google import genai
-from google.genai import types
+from .client import (
+    ai_available,
+    generate_json,
+)
 
 
 load_dotenv()
 
 
-GEMINI_MODEL = (
-    "gemini-2.5-flash"
-)
+KNOWN_SKILLS = [
+    "Python",
+    "Java",
+    "C++",
+    "JavaScript",
+    "TypeScript",
+    "React",
+    "FastAPI",
+    "Django",
+    "Flask",
+    "SQL",
+    "MySQL",
+    "PostgreSQL",
+    "MongoDB",
+    "Git",
+    "GitHub",
+    "Docker",
+    "Machine Learning",
+    "Deep Learning",
+    "Artificial Intelligence",
+    "Data Science",
+    "Pandas",
+    "NumPy",
+    "PyTorch",
+    "TensorFlow",
+    "REST APIs",
+]
 
 
 def clean_env_value(
-    value
+    value,
 ):
-
-    if not value:
-
-        return ""
-
-    return str(
-        value
-    ).strip()
+    return (
+        str(value or "")
+        .strip()
+    )
 
 
 def generate_unique_id(
     title,
     organization,
-    source_url
+    source_url,
 ):
-
     text = (
         f"{title}|"
         f"{organization}|"
@@ -56,135 +79,194 @@ def generate_unique_id(
 
     return int(
         digest[:12],
-        16
+        16,
     ) % 900000000
 
 
-# ============================================================
-# BUILD SEARCH QUERY
-# ============================================================
-
-def build_search_query(
-    student
+def domain_name(
+    url,
 ):
+    try:
+        return (
+            urlparse(
+                url or ""
+            )
+            .netloc
+            .replace(
+                "www.",
+                "",
+            )
+        )
+    except Exception:
+        return ""
 
+
+# ============================================================
+# MULTI-QUERY DISCOVERY
+# ============================================================
+
+def build_search_queries(
+    student,
+):
     opportunity_type = (
-
         student.get(
             "opportunity_type",
-            "internship"
+            "internship",
         )
+        or "internship"
+    ).strip().lower()
 
-        .strip()
-
-        .lower()
-    )
-
-    branch = student.get(
-        "branch",
-        ""
+    location = (
+        student.get(
+            "location",
+            "India",
+        )
+        or "India"
     ).strip()
-
-    location = student.get(
-        "location",
-        "India"
-    ).strip()
-
-    interests = student.get(
-        "interests",
-        []
-    )
-
-    skills = student.get(
-        "skills",
-        []
-    )
 
     keywords = []
 
-    if branch:
-
-        keywords.append(
-            branch
+    branch = (
+        student.get(
+            "branch",
+            "",
         )
+        or ""
+    ).strip()
+
+    if branch:
+        keywords.append(branch)
 
     keywords.extend(
-        interests[:3]
+        student.get(
+            "interests",
+            [],
+        )[:3]
     )
 
     keywords.extend(
-        skills[:3]
+        student.get(
+            "skills",
+            [],
+        )[:4]
     )
 
     keyword_text = " ".join(
-
         str(item).strip()
-
         for item in keywords
-
         if str(item).strip()
     )
 
-    search_map = {
+    query_map = {
+        "internship": [
+            (
+                f"{keyword_text} internship "
+                f"students apply {location}"
+            ),
 
-        "internship":
-        (
-            f"{keyword_text} internship "
-            f"students apply openings "
-            f"{location}"
-        ),
+            (
+                f"{keyword_text} student "
+                f"internship 2026 official"
+            ),
 
-        "hackathon":
-        (
-            f"{keyword_text} hackathon "
-            f"registration students "
-            f"{location}"
-        ),
+            (
+                f"{keyword_text} internship "
+                f"site:linkedin.com OR "
+                f"site:internshala.com"
+            ),
+        ],
 
-        "job":
-        (
-            f"{keyword_text} fresher "
-            f"entry level job apply "
-            f"{location}"
-        ),
+        "hackathon": [
+            (
+                f"{keyword_text} hackathon "
+                f"registration students 2026"
+            ),
 
-        "scholarship":
-        (
-            f"{keyword_text} scholarship "
-            f"students apply "
-            f"{location}"
-        ),
+            (
+                f"{keyword_text} student "
+                f"hackathon official registration"
+            ),
 
-        "competition":
-        (
-            f"{keyword_text} competition "
-            f"registration students "
-            f"{location}"
-        ),
+            (
+                f"{keyword_text} hackathon "
+                f"site:devpost.com OR "
+                f"site:unstop.com"
+            ),
+        ],
+
+        "scholarship": [
+            (
+                f"{keyword_text} scholarship "
+                f"students apply 2026"
+            ),
+
+            (
+                f"{keyword_text} scholarship "
+                f"official application"
+            ),
+
+            (
+                f"{keyword_text} scholarship "
+                f"site:gov.in OR site:edu.in"
+            ),
+        ],
+
+        "competition": [
+            (
+                f"{keyword_text} student "
+                f"competition registration"
+            ),
+
+            (
+                f"{keyword_text} competition "
+                f"2026 official"
+            ),
+
+            (
+                f"{keyword_text} student "
+                f"challenge site:unstop.com"
+            ),
+        ],
+
+        "job": [
+            (
+                f"{keyword_text} fresher "
+                f"entry level jobs {location}"
+            ),
+
+            (
+                f"{keyword_text} graduate "
+                f"jobs official careers"
+            ),
+
+            (
+                f"{keyword_text} fresher "
+                f"site:linkedin.com jobs"
+            ),
+        ],
     }
 
-    return search_map.get(
-
+    return query_map.get(
         opportunity_type,
 
-        (
-            f"{keyword_text} "
-            f"{opportunity_type} "
-            f"opportunities "
-            f"{location}"
-        )
+        [
+            (
+                f"{keyword_text} "
+                f"{opportunity_type} "
+                f"opportunities {location}"
+            ),
+        ],
     )
 
 
 # ============================================================
-# SERPAPI SEARCH
+# SERPAPI
 # ============================================================
 
 def search_serpapi(
     query,
-    max_results
+    max_results,
 ):
-
     serpapi_key = (
         clean_env_value(
             os.getenv(
@@ -194,50 +276,28 @@ def search_serpapi(
     )
 
     if not serpapi_key:
-
         raise ValueError(
             "SERPAPI_API_KEY is missing."
         )
 
-    url = (
-        "https://serpapi.com/search"
-    )
-
-    params = {
-
-        "engine":
-        "google",
-
-        "q":
-        query,
-
-        "hl":
-        "en",
-
-        "gl":
-        "in",
-
-        "num":
-        max_results,
-
-        "api_key":
-        serpapi_key
-    }
-
     response = requests.get(
+        "https://serpapi.com/search",
 
-        url,
+        params={
+            "engine": "google",
+            "q": query,
+            "hl": "en",
+            "gl": "in",
+            "num": max_results,
+            "api_key": serpapi_key,
+        },
 
-        params=params,
-
-        timeout=30
+        timeout=30,
     )
 
-    if response.status_code != 200:
-
+    if not response.ok:
         raise ValueError(
-
-            f"SerpApi request failed: "
+            "SerpApi request failed: "
             f"{response.status_code}"
         )
 
@@ -245,136 +305,154 @@ def search_serpapi(
 
     return data.get(
         "organic_results",
-        []
+        [],
     )
 
 
+def search_multiple_queries(
+    student,
+    max_results,
+):
+    queries = build_search_queries(
+        student
+    )
+
+    collected = []
+
+    per_query = max(
+        3,
+        max_results // max(
+            1,
+            len(queries),
+        ),
+    )
+
+    for query in queries:
+        try:
+            print(
+                f"\nSEARCH QUERY:\n{query}"
+            )
+
+            results = search_serpapi(
+                query,
+                per_query,
+            )
+
+            collected.extend(
+                results
+            )
+
+        except Exception as error:
+            print(
+                f"Search query failed: "
+                f"{error}"
+            )
+
+    seen = set()
+    unique = []
+
+    for result in collected:
+        link = (
+            result.get("link")
+            or ""
+        )
+
+        if not link or link in seen:
+            continue
+
+        seen.add(link)
+        unique.append(result)
+
+    return unique[:max_results]
+
+
 # ============================================================
-# FETCH PAGE CONTENT
+# PAGE EVIDENCE
 # ============================================================
 
 def fetch_page_content(
-    url
+    url,
 ):
-
     if not url:
-
         return ""
 
     try:
-
-        headers = {
-
-            "User-Agent":
-            (
-                "Mozilla/5.0 "
-                "(Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 "
-                "(KHTML, like Gecko) "
-                "Chrome/120 Safari/537.36"
-            )
-        }
-
         response = requests.get(
-
             url,
 
-            headers=headers,
+            headers={
+                "User-Agent":
+                    (
+                        "Mozilla/5.0 "
+                        "(Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 "
+                        "Chrome/120 Safari/537.36"
+                    )
+            },
 
-            timeout=12
+            timeout=12,
         )
 
-        if response.status_code != 200:
-
+        if not response.ok:
             return ""
 
         soup = BeautifulSoup(
-
             response.text,
-
-            "html.parser"
+            "html.parser",
         )
 
         for tag in soup([
-
             "script",
             "style",
             "nav",
             "footer",
             "header",
-            "aside"
-
+            "aside",
         ]):
-
             tag.decompose()
 
-
         text = soup.get_text(
-
             " ",
-
-            strip=True
+            strip=True,
         )
 
-        text = re.sub(
-
+        return re.sub(
             r"\s+",
-
             " ",
+            text,
+        )[:6000]
 
-            text
-        )
-
-        return text[:12000]
-
-
-    except Exception as error:
-
-        print(
-            f"Could not fetch page: "
-            f"{error}"
-        )
-
+    except Exception:
         return ""
 
 
-# ============================================================
-# CREATE RAG DOSSIER
-# ============================================================
-
 def create_search_dossier(
-    results
+    results,
 ):
-
-    dossier_parts = []
+    parts = []
 
     for index, result in enumerate(
         results
     ):
-
-        title = result.get(
-            "title",
-            ""
+        title = (
+            result.get(
+                "title",
+                "",
+            )
         )
 
-        snippet = result.get(
-            "snippet",
-            ""
+        snippet = (
+            result.get(
+                "snippet",
+                "",
+            )
         )
 
-        link = result.get(
-            "link",
-            ""
-        )
-
-        source = result.get(
-            "source",
-            ""
-        )
-
-        date = result.get(
-            "date",
-            ""
+        link = (
+            result.get(
+                "link",
+                "",
+            )
         )
 
         page_content = (
@@ -383,265 +461,511 @@ def create_search_dossier(
             )
         )
 
-        dossier_parts.append(
-
+        parts.append(
             f"""
-================================================
-SEARCH RESULT {index + 1}
-================================================
+RESULT {index + 1}
 
 TITLE:
 {title}
 
-SOURCE:
-{source}
-
-DATE:
-{date}
-
-SEARCH SNIPPET:
+SNIPPET:
 {snippet}
 
 SOURCE URL:
 {link}
 
 PAGE CONTENT:
-{page_content[:6000]}
+{page_content}
 """
         )
 
-    return "\n".join(
-        dossier_parts
-    )
+    return "\n".join(parts)
 
 
 # ============================================================
-# GEMINI RAG EXTRACTION
+# GROK STRUCTURED EXTRACTION
 # ============================================================
 
-def parse_with_gemini(
+SEARCH_SCHEMA = {
+    "type": "object",
+
+    "properties": {
+        "opportunities": {
+            "type": "array",
+
+            "items": {
+                "type": "object",
+
+                "properties": {
+                    "title": {
+                        "type": "string",
+                    },
+
+                    "organization": {
+                        "type": ["string", "null"],
+                    },
+
+                    "type": {
+                        "type": ["string", "null"],
+                    },
+
+                    "description": {
+                        "type": "string",
+                    },
+
+                    "year": {
+                        "type": "array",
+
+                        "items": {
+                            "type": "string",
+                        },
+                    },
+
+                    "branches": {
+                        "type": "array",
+
+                        "items": {
+                            "type": "string",
+                        },
+                    },
+
+                    "skills": {
+                        "type": "array",
+
+                        "items": {
+                            "type": "string",
+                        },
+                    },
+
+                    "location": {
+                        "type": ["string", "null"],
+                    },
+
+                    "remote": {
+                        "type": ["boolean", "null"],
+                    },
+
+                    "deadline": {
+                        "type": ["string", "null"],
+                    },
+
+                    "stipend": {
+                        "type": [
+                            "string",
+                            "number",
+                            "null",
+                        ],
+                    },
+
+                    "posted_time_ago": {
+                        "type": ["string", "null"],
+                    },
+
+                    "source_url": {
+                        "type": "string",
+                    },
+
+                    "application_url": {
+                        "type": ["string", "null"],
+                    },
+                },
+
+                "required": [
+                    "title",
+                    "organization",
+                    "type",
+                    "description",
+                    "year",
+                    "branches",
+                    "skills",
+                    "location",
+                    "remote",
+                    "deadline",
+                    "stipend",
+                    "posted_time_ago",
+                    "source_url",
+                    "application_url",
+                ],
+
+                "additionalProperties": False,
+            },
+        },
+    },
+
+    "required": [
+        "opportunities",
+    ],
+
+    "additionalProperties": False,
+}
+
+
+def parse_with_ai(
     student,
     dossier,
-    max_results
+    max_results,
 ):
 
-    gemini_key = (
-        clean_env_value(
-            os.getenv(
-                "GEMINI_API_KEY"
-            )
-        )
-    )
+    result = generate_json(
 
-    if not gemini_key:
+        system_prompt="""
+You are a strict retrieval-grounded student opportunity extraction engine.
 
-        raise ValueError(
-            "GEMINI_API_KEY is missing."
-        )
+Use only evidence supplied in the search dossier.
 
-    opportunity_type = (
-        student.get(
-            "opportunity_type",
-            "internship"
-        )
-    )
+Never invent:
+- deadlines
+- stipend
+- eligibility
+- organization names
+- skills
+- locations
+- application links
 
-    prompt = f"""
-You are a retrieval-grounded opportunity extraction engine.
+Prefer official sources when evidence supports them.
 
-You must use ONLY the evidence provided below.
+Reject irrelevant, expired or unrelated results.
 
-The user is searching for:
+If information is unknown:
 
-Opportunity type:
-{opportunity_type}
+- use null for unknown scalar values
+- use [] for unknown list values
 
+Return only opportunities that are genuinely relevant to
+the student's requested opportunity type and profile.
+""",
+
+        user_prompt=f"""
 Student profile:
+
 {json.dumps(student, indent=2)}
 
-Your task:
+Return at most {max_results} relevant opportunities.
 
-1. Identify real opportunities.
-2. Remove irrelevant results.
-3. Extract only information supported by evidence.
-4. Never invent deadlines, stipend, eligibility, or skills.
-5. Keep the exact source URL.
-6. Prefer official organization sources.
+For every opportunity:
 
-Return only valid JSON.
+- title must come from evidence
+- organization must come from evidence where possible
+- source_url must be the exact evidence URL
+- application_url must only be used if the evidence clearly
+  represents an application destination
+- skills must only contain skills supported by evidence
+- do not invent dates
+- do not invent stipend information
+- do not invent eligibility requirements
 
-Schema:
+EVIDENCE:
+
+{dossier}
+""",
+
+        schema_name="student_opportunity_search",
+
+        schema=SEARCH_SCHEMA,
+    )
+
+    opportunities = (
+        result.get(
+            "opportunities",
+            [],
+        )
+    )
+
+    if not isinstance(
+        opportunities,
+        list,
+    ):
+        return {
+            "opportunities": []
+        }
+
+    return {
+        "opportunities":
+        opportunities[:max_results]
+    }
+    prompt = f"""
+Student profile:
+
+{json.dumps(student, indent=2)}
+
+Return at most {max_results} real opportunities.
+
+For each opportunity, use exactly this JSON structure:
 
 {{
-    "opportunities": [
-        {{
-            "title": "string",
-            "organization": null,
-            "description": "string",
-            "year": [],
-            "branches": [],
-            "skills": [],
-            "location": null,
-            "remote": null,
-            "deadline": null,
-            "stipend": null,
-            "posted_time_ago": null,
-            "is_still_accepting": null,
-            "verification_score": "Low",
-            "source_url": "string",
-            "application_url": null
-        }}
-    ]
+  "opportunities": [
+    {{
+      "title": "string",
+      "organization": "string or null",
+      "type": "string or null",
+      "description": "string",
+      "year": [],
+      "branches": [],
+      "skills": [],
+      "location": "string or null",
+      "remote": true,
+      "deadline": "string or null",
+      "stipend": "string or number or null",
+      "posted_time_ago": "string or null",
+      "source_url": "string",
+      "application_url": "string or null"
+    }}
+  ]
 }}
 
 Rules:
 
-- Return maximum {max_results}.
-- Never invent information.
-- Use null when scalar information is unknown.
-- Use [] when list information is unknown.
-- is_still_accepting must be null unless evidence clearly supports it.
-- application_url must be an exact application URL found in the evidence.
-- If no application URL is found, use null.
-- verification_score must be exactly High, Medium, or Low.
-- High = official organization source.
-- Medium = trusted opportunity platform.
-- Low = unclear or secondary source.
+- Use only evidence supplied below.
+- Never invent deadlines.
+- Never invent stipend information.
+- Never invent eligibility requirements.
+- Never invent organization names.
+- Never invent skills.
+- Never invent locations.
+- Never invent application links.
+- Prefer official sources.
+- Reject irrelevant results.
+- Preserve the exact evidence source URL.
+- application_url must only be used when the evidence clearly indicates an application destination.
+- Unknown scalar values must be null.
+- Unknown lists must be [].
+- Return only valid JSON.
+- Do not include markdown.
 
-WEB EVIDENCE:
+EVIDENCE:
 
 {dossier}
 """
 
-    client = genai.Client(
-        api_key=gemini_key
-    )
+    return generate_json(
+        prompt=prompt,
 
-    response = (
-        client.models.generate_content(
+        system_prompt="""
+You are a strict retrieval-grounded student opportunity extraction engine.
 
-            model=GEMINI_MODEL,
+Use only evidence supplied by the user.
 
-            contents=prompt,
+Never invent deadlines, stipend, eligibility, organization names,
+skills, locations, or application links.
 
-            config=(
-                types.GenerateContentConfig(
+Prefer official sources.
 
-                    temperature=0.0,
+Reject irrelevant results.
 
-                    response_mime_type=(
-                        "application/json"
-                    )
-                )
-            )
-        )
-    )
-
-    raw_text = (
-        response.text
-        or ""
-    )
-
-    if not raw_text:
-
-        raise ValueError(
-            "Gemini returned empty content."
-        )
-
-    clean_text = re.sub(
-
-        r"```json|```",
-
-        "",
-
-        raw_text,
-
-        flags=re.IGNORECASE
-
-    ).strip()
-
-    return json.loads(
-        clean_text
+Return only valid JSON.
+Do not use markdown.
+""",
     )
 
 
 # ============================================================
-# NORMALIZE RESULTS
+# RULE-BASED FALLBACK
+# ============================================================
+
+def infer_skills(
+    text,
+):
+    lower_text = (
+        text or ""
+    ).lower()
+
+    return [
+        skill
+        for skill in KNOWN_SKILLS
+        if skill.lower()
+        in lower_text
+    ]
+
+
+def infer_remote(
+    text,
+):
+    lower_text = (
+        text or ""
+    ).lower()
+
+    if "remote" in lower_text:
+        return True
+
+    if (
+        "on-site" in lower_text
+        or "onsite" in lower_text
+    ):
+        return False
+
+    return None
+
+
+def infer_deadline(
+    text,
+):
+    match = re.search(
+        r"\d{4}-\d{2}-\d{2}",
+        text or "",
+    )
+
+    if match:
+        return match.group(0)
+
+    return None
+
+
+def rule_based_results(
+    student,
+    results,
+):
+    opportunity_type = (
+        student.get(
+            "opportunity_type",
+            "internship",
+        )
+    )
+
+    fallback = []
+
+    for result in results:
+        title = (
+            result.get(
+                "title",
+                ""
+            )
+            .strip()
+        )
+
+        link = (
+            result.get(
+                "link",
+                ""
+            )
+            .strip()
+        )
+
+        snippet = (
+            result.get(
+                "snippet",
+                ""
+            )
+            .strip()
+        )
+
+        if not title or not link:
+            continue
+
+        text = (
+            f"{title} {snippet}"
+        )
+
+        fallback.append({
+            "title": title,
+
+            "organization":
+                domain_name(link),
+
+            "type":
+                opportunity_type,
+
+            "description":
+                snippet or
+                "Live opportunity discovered "
+                "from web search.",
+
+            "year": [],
+
+            "branches": [],
+
+            "skills":
+                infer_skills(text),
+
+            "location": None,
+
+            "remote":
+                infer_remote(text),
+
+            "deadline":
+                infer_deadline(text),
+
+            "stipend": None,
+
+            "posted_time_ago": None,
+
+            "source_url": link,
+
+            "application_url": link,
+        })
+
+    return fallback
+
+
+# ============================================================
+# NORMALIZATION
 # ============================================================
 
 def normalize_opportunities(
-    opportunities
+    opportunities,
 ):
-
     normalized = []
 
     for opportunity in opportunities:
-
-        title = opportunity.get(
-            "title"
+        opportunity = dict(
+            opportunity
         )
 
-        source_url = opportunity.get(
-            "source_url"
+        title = (
+            str(
+                opportunity.get(
+                    "title",
+                    "",
+                )
+            )
+            .strip()
+        )
+
+        source_url = (
+            str(
+                opportunity.get(
+                    "source_url",
+                    "",
+                )
+            )
+            .strip()
         )
 
         if not title or not source_url:
-
             continue
 
         organization = (
             opportunity.get(
                 "organization"
             )
-            or ""
-        )
-
-        opportunity["id"] = (
-            generate_unique_id(
-
-                title,
-
-                organization,
-
+            or domain_name(
                 source_url
             )
         )
 
-        for field in [
+        opportunity[
+            "organization"
+        ] = organization
 
-            "year",
-            "branches",
-            "skills"
-
-        ]:
-
-            if not isinstance(
-                opportunity.get(
-                    field
-                ),
-                list
-            ):
-
-                opportunity[field] = []
-
-        verification_score = (
-            opportunity.get(
-                "verification_score",
-                "Low"
-            )
+        opportunity[
+            "id"
+        ] = generate_unique_id(
+            title,
+            organization,
+            source_url,
         )
 
-        if verification_score not in [
-
-            "High",
-            "Medium",
-            "Low"
-
+        for field in [
+            "year",
+            "branches",
+            "skills",
         ]:
+            if not isinstance(
+                opportunity.get(field),
+                list,
+            ):
+                opportunity[field] = []
 
-            opportunity[
-                "verification_score"
-            ] = "Low"
+        
 
         normalized.append(
             opportunity
@@ -656,74 +980,85 @@ def normalize_opportunities(
 
 def search_real_opportunities(
     student,
-    max_results=10
+    max_results=10,
 ):
+    print(
+        "\n========================================"
+    )
 
-    try:
+    print(
+        "STARTING MULTI-QUERY OPPORTUNITY SEARCH"
+    )
 
-        search_query = (
-            build_search_query(
-                student
-            )
+    print(
+        "========================================"
+    )
+
+    search_results = (
+        search_multiple_queries(
+            student,
+            max_results=max_results * 2,
         )
+    )
 
-        search_results = (
-            search_serpapi(
+    if not search_results:
+        return []
 
-                search_query,
+    opportunities = []
 
-                max_results
+    if ai_available():
+        try:
+            dossier = (
+                create_search_dossier(
+                    search_results[:10]
+                )
             )
-        )
 
-        if not search_results:
-
-            return []
-
-        dossier = (
-            create_search_dossier(
-                search_results
-            )
-        )
-
-        parsed_data = (
-            parse_with_gemini(
-
+            parsed = parse_with_ai(
                 student,
-
                 dossier,
-
-                max_results
+                max_results,
             )
+
+            opportunities = (
+                parsed.get(
+                    "opportunities",
+                    [],
+                )
+            )
+
+            print(
+                "AI EXTRACTION: SUCCESS"
+            )
+
+        except Exception as error:
+            print(
+                f"AI EXTRACTION FAILED: "
+                f"{type(error).__name__}: "
+                f"{error}"
+            )
+
+    if not opportunities:
+        print(
+            "USING RULE-BASED FALLBACK"
         )
 
         opportunities = (
-            parsed_data.get(
-                "opportunities",
-                []
+            rule_based_results(
+                student,
+                search_results,
             )
         )
 
-        final_results = (
-            normalize_opportunities(
-                opportunities
-            )
+    final_results = (
+        normalize_opportunities(
+            opportunities
         )
+    )
 
-        print(
-            f"Final opportunities: "
-            f"{len(final_results)}"
-        )
+    print(
+        f"FINAL RESULTS: "
+        f"{len(final_results)}"
+    )
 
-        return final_results
-
-
-    except Exception as error:
-
-        print(
-            f"LIVE SEARCH ERROR: "
-            f"{type(error).__name__}: "
-            f"{error}"
-        )
-
-        return []
+    return final_results[:max_results]

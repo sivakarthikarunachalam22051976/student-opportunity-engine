@@ -1,7 +1,15 @@
 import os
+import re
+
+from .skill_normalizer import (
+    SKILL_ALIASES,
+    normalize_skills,
+)
 
 
-def extract_resume_text(file_path):
+def extract_resume_text(
+    file_path,
+):
     extension = (
         os.path.splitext(
             file_path
@@ -16,22 +24,16 @@ def extract_resume_text(file_path):
             file_path
         )
 
-        text_parts = []
-
-        for page in reader.pages:
-            text_parts.append(
-                page.extract_text() or ""
-            )
-
         return "\n".join(
-            text_parts
+            page.extract_text() or ""
+            for page in reader.pages
         ).strip()
 
     if extension == ".txt":
         with open(
             file_path,
             "r",
-            encoding="utf-8"
+            encoding="utf-8",
         ) as file:
             return file.read()
 
@@ -41,14 +43,41 @@ def extract_resume_text(file_path):
     )
 
 
-def parse_resume_text(text):
-    if not text or not text.strip():
+def parse_resume_text(
+    text,
+):
+    text = (
+        text or ""
+    ).strip()
+
+    if not text:
         return {
             "text": "",
             "skills": [],
         }
 
+    lower_text = text.lower()
+
+    detected = []
+
+    for alias in SKILL_ALIASES:
+        pattern = (
+            r"(?<!\w)"
+            + re.escape(alias)
+            + r"(?!\w)"
+        )
+
+        if re.search(
+            pattern,
+            lower_text,
+        ):
+            detected.append(alias)
+
     return {
-        "text": text.strip(),
-        "skills": [],
+        "text": text,
+
+        "skills":
+            normalize_skills(
+                detected
+            ),
     }

@@ -1,107 +1,82 @@
 import json
-import re
 
-from google.genai import (
-    types
-)
-
-from .client import (
-    client
-)
-
-
-GEMINI_MODEL = (
-    "gemini-2.5-flash"
-)
+from .client import client
 
 
 def parse_opportunity_text(
     text: str
-):
+) -> dict:
 
     prompt = f"""
-You are an opportunity information extraction engine.
+You are an opportunity data extraction engine.
 
-Extract structured information from the opportunity text below.
+Extract information ONLY from the supplied text.
 
-Return only JSON.
-
-Use exactly this schema:
+Return valid JSON using exactly this structure:
 
 {{
-    "title": null,
-    "organization": null,
+    "title": "",
+    "organization": "",
+    "description": "",
     "year": [],
     "branches": [],
     "skills": [],
-    "location": null,
-    "remote": null,
-    "deadline": null,
-    "stipend": null,
-    "documents": []
+    "location": "",
+    "remote": false,
+    "deadline": "",
+    "stipend": "",
+    "posted_time_ago": "",
+    "is_still_accepting": true,
+    "verification_score": "Medium",
+    "source_url": ""
 }}
 
 Rules:
 
-- Do not invent information.
-- year must be an array.
-- branches must be an array.
-- skills must be an array.
-- documents must be an array.
-- stipend must be a number only if clearly stated.
-- remote must be true or false only if clearly supported.
-- Use null when a scalar value is unknown.
-- Use [] when list information is unknown.
+- Do not invent facts.
+- Use empty strings when text is unavailable.
+- Use empty arrays when list information is unavailable.
+- year must always be an array.
+- branches must always be an array.
+- skills must always be an array.
+- remote must always be true or false.
+- is_still_accepting must always be true or false.
 - Return JSON only.
+- Do not include markdown.
+- Do not include explanations.
 
 Opportunity text:
 
 {text}
 """
 
-    try:
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-20b",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You extract structured opportunity "
+                    "information accurately. "
+                    "Never invent missing information."
+                ),
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ],
+        temperature=0,
+        response_format={
+            "type": "json_object"
+        },
+    )
 
-        response = (
-            client.models.generate_content(
+    content = (
+        response
+        .choices[0]
+        .message
+        .content
+    )
 
-                model=GEMINI_MODEL,
-
-                contents=prompt,
-
-                config=(
-                    types.GenerateContentConfig(
-
-                        temperature=0.0,
-
-                        response_mime_type=(
-                            "application/json"
-                        )
-                    )
-                )
-            )
-        )
-
-        raw_text = (
-            response.text
-            or ""
-        )
-
-        clean_text = re.sub(
-            r"```json|```",
-            "",
-            raw_text,
-            flags=re.IGNORECASE
-        ).strip()
-
-        return json.loads(
-            clean_text
-        )
-
-
-    except Exception as error:
-
-        return {
-
-            "error":
-            str(error)
-        }
+    return json.loads(content)
