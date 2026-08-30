@@ -1,3 +1,4 @@
+
 import { Sparkles, Target, BrainCircuit, ArrowRight } from "lucide-react";
 
 type SmartMatchPanelProps = {

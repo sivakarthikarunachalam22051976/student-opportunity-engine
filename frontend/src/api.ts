@@ -1,13 +1,19 @@
+
 import type {
+  ComparisonResponse,
+  FuturePathResponse,
+  HiddenRecommendation,
   MatchResponse,
   Opportunity,
+  PreparationResponse,
+  SearchResponse,
   StudentProfile,
+  WhyNotResponse,
+  ProfileIntelligence,
+  ReadinessSimulationResponse,
+  ApplicationStrategyResponse,
 } from "./types";
 
-
-// ============================================================
-// API BASE URL
-// ============================================================
 
 const API =
   window.location.hostname === "localhost" ||
@@ -16,22 +22,113 @@ const API =
     : "https://student-opportunity-engine.onrender.com";
 
 
-// ============================================================
-// HELPER
-// ============================================================
+async function getErrorMessage(
+  response: Response,
+): Promise<string> {
 
-async function getErrorMessage(response: Response): Promise<string> {
   try {
-    const data = await response.json();
 
-    if (typeof data?.detail === "string") {
+    const data =
+      await response.json();
+
+    if (
+      typeof data?.detail ===
+      "string"
+    ) {
       return data.detail;
     }
 
     return JSON.stringify(data);
+
   } catch {
-    return response.statusText || "Unknown backend error";
+
+    return (
+      response.statusText ||
+      "Unknown backend error"
+    );
   }
+}
+
+
+async function request<T>(
+  endpoint: string,
+  options?: RequestInit,
+): Promise<T> {
+
+  const response =
+    await fetch(
+      `${API}${endpoint}`,
+      {
+        ...options,
+
+        headers: {
+          "Content-Type":
+            "application/json",
+
+          ...(options?.headers || {}),
+        },
+      },
+    );
+
+  if (!response.ok) {
+
+    throw new Error(
+      `${response.status}: ${
+        await getErrorMessage(response)
+      }`
+    );
+  }
+
+  return response.json();
+}
+
+
+// ============================================================
+// HEALTH
+// ============================================================
+
+export async function getHealth() {
+
+  return request<{
+    status: string;
+    message: string;
+  }>("/api/health");
+}
+
+
+// ============================================================
+// STUDENT
+// ============================================================
+
+export async function getStudentProfile() {
+
+  return request<StudentProfile>(
+    "/api/student",
+  );
+}
+
+
+export async function saveStudentProfile(
+  profile: StudentProfile,
+) {
+
+  const response =
+    await request<{
+      message: string;
+      student: StudentProfile;
+    }>(
+      "/api/student/profile",
+      {
+        method: "POST",
+
+        body:
+          JSON.stringify(
+            profile,
+          ),
+      },
+    );
+
+  return response.student;
 }
 
 
@@ -39,219 +136,164 @@ async function getErrorMessage(response: Response): Promise<string> {
 // OPPORTUNITIES
 // ============================================================
 
-export async function getOpportunities(): Promise<Opportunity[]> {
-  const response = await fetch(
-    `${API}/api/opportunities`
+export async function getOpportunities() {
+
+  return request<Opportunity[]>(
+    "/api/opportunities",
   );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch opportunities: ${await getErrorMessage(response)}`
-    );
-  }
-
-  return response.json();
 }
 
 
-// ============================================================
-// STUDENT PROFILE
-// ============================================================
+export async function searchOpportunities(
+  profile: StudentProfile,
+) {
 
-export async function getStudentProfile(): Promise<StudentProfile> {
-  const response = await fetch(
-    `${API}/api/student`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch student profile: ${await getErrorMessage(response)}`
-    );
-  }
-
-  return response.json();
-}
-
-
-export async function saveStudentProfile(
-  profile: StudentProfile
-): Promise<StudentProfile> {
-
-  const response = await fetch(
-    `${API}/api/student/profile`,
+  return request<SearchResponse>(
+    "/api/ai/search-opportunities",
     {
       method: "POST",
 
-      headers: {
-        "Content-Type": "application/json",
-      },
-
-      body: JSON.stringify(profile),
-    }
+      body:
+        JSON.stringify(
+          profile,
+        ),
+    },
   );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to save student profile: ${await getErrorMessage(response)}`
-    );
-  }
-
-  const data = await response.json();
-
-  // Backend returns:
-  // {
-  //   message: "...",
-  //   student: {...}
-  // }
-
-  return data.student;
 }
 
 
 // ============================================================
-// LIVE AI SEARCH
-// ============================================================
-
-export async function searchOpportunities(
-  profile: StudentProfile
-): Promise<{
-  opportunities: Opportunity[];
-  count: number;
-}> {
-
-  console.log(
-    "Current student profile:",
-    profile
-  );
-
-  const response = await fetch(
-    `${API}/api/ai/search-opportunities`
-  );
-
-  if (!response.ok) {
-    const errorText =
-      await getErrorMessage(response);
-
-    console.error(
-      "Search API error:",
-      response.status,
-      errorText
-    );
-
-    throw new Error(
-      `Failed to search opportunities: ${errorText}`
-    );
-  }
-
-  return response.json();
-}
-
-
-// ============================================================
-// BASIC MATCH
+// MATCH
 // ============================================================
 
 export async function getMatch(
-  id: number
-): Promise<MatchResponse> {
-
-  const response = await fetch(
-    `${API}/api/match/${id}`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch match: ${await getErrorMessage(response)}`
-    );
-  }
-
-  return response.json();
-}
-
-
-// ============================================================
-// ELIGIBILITY
-// ============================================================
-
-export async function getEligibility(
-  id: number
+  id: number,
 ) {
 
-  const response = await fetch(
-    `${API}/api/eligibility/${id}`
+  return request<MatchResponse>(
+    `/api/match/${id}`,
   );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch eligibility: ${await getErrorMessage(response)}`
-    );
-  }
-
-  return response.json();
 }
 
 
-// ============================================================
-// SEMANTIC MATCH
-// ============================================================
-
-export async function getSemanticMatch(
-  id: number
+export async function getWhyNot(
+  id: number,
 ) {
 
-  const response = await fetch(
-    `${API}/api/semantic-match/${id}`
+  return request<WhyNotResponse>(
+    `/api/why-not/${id}`,
   );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch semantic match: ${await getErrorMessage(response)}`
-    );
-  }
-
-  return response.json();
 }
 
 
 // ============================================================
-// GAP ANALYSIS
-// ============================================================
-
-export async function getGaps(
-  id: number
-) {
-
-  const response = await fetch(
-    `${API}/api/gap_analysis/${id}`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch skill gaps: ${await getErrorMessage(response)}`
-    );
-  }
-
-  return response.json();
-}
-
-
-// ============================================================
-// RESOURCE ROADMAP
+// PREPARATION
 // ============================================================
 
 export async function getPreparation(
-  id: number
+  id: number,
 ) {
 
-  const response = await fetch(
-    `${API}/api/resource-roadmap/${id}`
+  return request<PreparationResponse>(
+    `/api/prepare/${id}`,
+  );
+}
+
+
+// ============================================================
+// FUTURE PATH
+// ============================================================
+
+export async function getFuturePath(
+  id: number,
+) {
+
+  return request<FuturePathResponse>(
+    `/api/future-path/${id}`,
+  );
+}
+
+
+// ============================================================
+// HIDDEN OPPORTUNITIES
+// ============================================================
+
+export async function getHiddenOpportunities() {
+
+  return request<
+    HiddenRecommendation[]
+  >(
+    "/api/hidden-opportunities",
+  );
+}
+
+
+// ============================================================
+// COMPARISON
+// ============================================================
+
+export async function compareOpportunities(
+  ids: number[],
+) {
+
+  const params =
+    new URLSearchParams();
+
+  ids.forEach(
+    (id) => {
+      params.append(
+        "opportunity_ids",
+        String(id),
+      );
+    },
   );
 
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch preparation plan: ${await getErrorMessage(response)}`
-    );
-  }
+  return request<ComparisonResponse>(
+    `/api/compare?${params.toString()}`,
+  );
+}
 
-  return response.json();
+// ============================================================
+// ADVANCED INTELLIGENCE
+// ============================================================
+
+export async function getProfileIntelligence() {
+  return request<ProfileIntelligence>(
+    "/api/profile-intelligence",
+  );
+}
+
+export async function simulateReadiness(
+  opportunityId: number,
+  addedSkills: string[],
+  addedProjects = 0,
+) {
+  return request<ReadinessSimulationResponse>(
+    `/api/readiness-simulator/${opportunityId}`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        added_skills: addedSkills,
+        added_projects: addedProjects,
+      }),
+    },
+  );
+}
+
+export async function getApplicationStrategy(
+  opportunityId: number,
+) {
+  return request<ApplicationStrategyResponse>(
+    `/api/application-strategy/${opportunityId}`,
+  );
+}
+
+export async function parseResume(text: string) {
+  return request<unknown>(
+    "/api/resume/parse",
+    {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    },
+  );
 }
