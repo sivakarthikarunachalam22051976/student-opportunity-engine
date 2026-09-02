@@ -1,4 +1,3 @@
-
 import {
   useEffect,
   useMemo,
@@ -27,6 +26,7 @@ import {
   getFuturePath,
   getHealth,
   getProfileIntelligence,
+  getWorkspace,
   simulateReadiness,
   getApplicationStrategy,
   parseResume,
@@ -40,6 +40,7 @@ import {
 } from "./api";
 
 import ProfileModal from "./components/ProfileModal";
+import OpportunityWorkspace from "./components/OpportunityWorkspace";
 
 import {
   demoProfile,
@@ -57,6 +58,7 @@ import type {
   ProfileIntelligence,
   ReadinessSimulationResponse,
   ApplicationStrategyResponse,
+  OpportunityWorkspace as WorkspaceData,
 } from "./types";
 
 
@@ -79,7 +81,7 @@ const filters = [
 
 function formatTrustLabel(
   score: number,
-) {
+): string {
 
   if (score >= 90) {
     return "High confidence";
@@ -97,10 +99,9 @@ function formatTrustLabel(
 }
 
 
-
 function getTrustScore(
   opportunity: Opportunity,
-) {
+): number {
 
   const backendScore =
     Number(
@@ -158,12 +159,17 @@ function getTrustScore(
 
 function App() {
 
+  // ==========================================================
+  // CORE STATE
+  // ==========================================================
+
   const [
     profile,
     setProfile,
   ] = useState<StudentProfile>(
     demoProfile,
   );
+
 
   const [
     opportunities,
@@ -172,12 +178,14 @@ function App() {
     [],
   );
 
+
   const [
     selected,
     setSelected,
   ] = useState<Opportunity | null>(
     null,
   );
+
 
   const [
     match,
@@ -186,12 +194,14 @@ function App() {
     null,
   );
 
+
   const [
     whyNot,
     setWhyNot,
   ] = useState<WhyNotResponse | null>(
     null,
   );
+
 
   const [
     preparation,
@@ -200,12 +210,14 @@ function App() {
     null,
   );
 
+
   const [
     futurePath,
     setFuturePath,
   ] = useState<FuturePathResponse | null>(
     null,
   );
+
 
   const [
     hidden,
@@ -214,12 +226,14 @@ function App() {
     [],
   );
 
+
   const [
     compareIds,
     setCompareIds,
   ] = useState<number[]>(
     [],
   );
+
 
   const [
     comparison,
@@ -228,6 +242,7 @@ function App() {
     [],
   );
 
+
   const [
     view,
     setView,
@@ -235,30 +250,40 @@ function App() {
     "dashboard",
   );
 
+
+  // ==========================================================
+  // SEARCH / LOADING STATE
+  // ==========================================================
+
   const [
     query,
     setQuery,
   ] = useState("");
+
 
   const [
     filter,
     setFilter,
   ] = useState("All");
 
+
   const [
     loading,
     setLoading,
   ] = useState(false);
+
 
   const [
     analysisLoading,
     setAnalysisLoading,
   ] = useState(false);
 
+
   const [
     backendOnline,
     setBackendOnline,
   ] = useState(false);
+
 
   const [
     status,
@@ -267,20 +292,112 @@ function App() {
     "Engine ready. Build your profile and launch discovery.",
   );
 
+
   const [
     profileOpen,
     setProfileOpen,
   ] = useState(false);
 
-  const [profileIntel, setProfileIntel] = useState<ProfileIntelligence | null>(null);
-  const [simulation, setSimulation] = useState<ReadinessSimulationResponse | null>(null);
-  const [simulationSkills, setSimulationSkills] = useState("");
-  const [simulationProjects, setSimulationProjects] = useState(0);
-  const [strategy, setStrategy] = useState<ApplicationStrategyResponse | null>(null);
-  const [strategyLoading, setStrategyLoading] = useState(false);
-  const [resumeResult, setResumeResult] = useState<any>(null);
-  const [resumeLoading, setResumeLoading] = useState(false);
 
+  // ==========================================================
+  // PROFILE INTELLIGENCE
+  // ==========================================================
+
+  const [
+    profileIntel,
+    setProfileIntel,
+  ] = useState<ProfileIntelligence | null>(
+    null,
+  );
+
+
+  // ==========================================================
+  // READINESS SIMULATOR
+  // ==========================================================
+
+  const [
+    simulation,
+    setSimulation,
+  ] = useState<ReadinessSimulationResponse | null>(
+    null,
+  );
+
+
+  const [
+    simulationSkills,
+    setSimulationSkills,
+  ] = useState("");
+
+
+  const [
+    simulationProjects,
+    setSimulationProjects,
+  ] = useState(0);
+
+
+  // ==========================================================
+  // APPLICATION STRATEGY
+  // ==========================================================
+
+  const [
+    strategy,
+    setStrategy,
+  ] = useState<ApplicationStrategyResponse | null>(
+    null,
+  );
+
+
+  const [
+    strategyLoading,
+    setStrategyLoading,
+  ] = useState(false);
+
+
+  // ==========================================================
+  // RESUME
+  // ==========================================================
+
+  const [
+    resumeResult,
+    setResumeResult,
+  ] = useState<unknown>(
+    null,
+  );
+
+
+  const [
+    resumeLoading,
+    setResumeLoading,
+  ] = useState(false);
+
+
+  // ==========================================================
+  // OPPORTUNITY WORKSPACE
+  // ==========================================================
+
+  const [
+    workspace,
+    setWorkspace,
+  ] = useState<WorkspaceData | null>(
+    null,
+  );
+
+
+  const [
+    workspaceLoading,
+    setWorkspaceLoading,
+  ] = useState(false);
+
+
+  const [
+    workspaceOpen,
+    setWorkspaceOpen,
+  ] = useState(false);
+
+
+  // ==========================================================
+  // INITIALIZATION
+  // ==========================================================
 
   useEffect(() => {
 
@@ -292,8 +409,10 @@ function App() {
 
         setBackendOnline(true);
 
+
         const saved =
           await getStudentProfile();
+
 
         if (
           saved?.name ||
@@ -302,15 +421,14 @@ function App() {
           setProfile(saved);
         }
 
+
         try {
 
           const hiddenData =
             await getHiddenOpportunities();
 
           setHidden(
-            Array.isArray(
-              hiddenData,
-            )
+            Array.isArray(hiddenData)
               ? hiddenData
               : [],
           );
@@ -321,33 +439,66 @@ function App() {
 
         }
 
+
         try {
-          setProfileIntel(await getProfileIntelligence());
+
+          const intelligence =
+            await getProfileIntelligence();
+
+          setProfileIntel(
+            intelligence,
+          );
+
         } catch {
+
           setProfileIntel(null);
+
         }
 
       } catch (error) {
 
-        console.error(error);
+        console.error(
+          "Initialization failed:",
+          error,
+        );
 
         setBackendOnline(false);
 
       }
+
     }
 
-    initialize();
+
+    void initialize();
 
   }, []);
 
 
+  // ==========================================================
+  // SAFE DATA
+  // ==========================================================
+
   const safeOpportunities =
-    Array.isArray(
-      opportunities,
-    )
+    Array.isArray(opportunities)
       ? opportunities
       : [];
 
+
+  const safeHidden =
+    Array.isArray(hidden)
+      ? hidden
+      : [];
+
+
+  const safeComparison =
+    Array.isArray(comparison)
+      ? comparison
+      : [];
+
+
+  // ==========================================================
+  // FILTERED OPPORTUNITIES
+  // ==========================================================
 
   const filtered =
     useMemo(() => {
@@ -357,12 +508,14 @@ function App() {
           .trim()
           .toLowerCase();
 
+
       return safeOpportunities.filter(
         (item) => {
 
           const text = [
             item.title,
             item.organization,
+            item.company,
             item.type,
             item.description,
             ...(item.skills || []),
@@ -371,24 +524,33 @@ function App() {
             .join(" ")
             .toLowerCase();
 
+
           const searchMatch =
             !normalizedQuery ||
             text.includes(
               normalizedQuery,
             );
 
+
           const filterMatch =
             filter === "All" ||
-            item.type
-              ?.toLowerCase()
-              .includes(
-                filter.toLowerCase(),
-              );
+            (
+              item.type
+                ?.toLowerCase()
+                .includes(
+                  filter.toLowerCase(),
+                )
+            ) ||
+            text.includes(
+              filter.toLowerCase(),
+            );
+
 
           return (
             searchMatch &&
             filterMatch
           );
+
         },
       );
 
@@ -398,6 +560,59 @@ function App() {
       filter,
     ]);
 
+
+  // ==========================================================
+  // OPEN WORKSPACE
+  // ==========================================================
+
+  async function openWorkspace(
+    opportunity: Opportunity,
+  ) {
+
+    setSelected(
+      opportunity,
+    );
+
+    setWorkspaceOpen(true);
+
+    setWorkspaceLoading(true);
+
+    setWorkspace(null);
+
+    try {
+
+      const data =
+        await getWorkspace(
+          opportunity.id,
+        );
+
+      setWorkspace(
+        data,
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Workspace loading failed:",
+        error,
+      );
+
+      setStatus(
+        "Opportunity workspace could not be loaded.",
+      );
+
+    } finally {
+
+      setWorkspaceLoading(false);
+
+    }
+
+  }
+
+
+  // ==========================================================
+  // LAUNCH ENGINE
+  // ==========================================================
 
   async function launchEngine() {
 
@@ -414,16 +629,21 @@ function App() {
           profile,
         );
 
-      setProfile(saved);
+      setProfile(
+        saved,
+      );
+
 
       setStatus(
         "Searching live opportunity sources...",
       );
 
+
       const result =
         await searchOpportunities(
           saved,
         );
+
 
       const discovered =
         Array.isArray(
@@ -432,14 +652,17 @@ function App() {
           ? result.opportunities
           : [];
 
+
       setOpportunities(
         discovered,
       );
+
 
       setSelected(
         discovered[0] ||
         null,
       );
+
 
       setComparison([]);
 
@@ -449,9 +672,15 @@ function App() {
 
       setFuturePath(null);
 
+      setWorkspace(null);
+
+      setWorkspaceOpen(false);
+
+
       setStatus(
         `${discovered.length} opportunities discovered and ranked.`,
       );
+
 
       if (
         discovered[0]
@@ -460,7 +689,9 @@ function App() {
         await selectOpportunity(
           discovered[0],
         );
+
       }
+
 
       try {
 
@@ -468,9 +699,7 @@ function App() {
           await getHiddenOpportunities();
 
         setHidden(
-          Array.isArray(
-            hiddenData,
-          )
+          Array.isArray(hiddenData)
             ? hiddenData
             : [],
         );
@@ -481,15 +710,25 @@ function App() {
 
       }
 
+
       try {
-        setProfileIntel(await getProfileIntelligence());
+
+        setProfileIntel(
+          await getProfileIntelligence(),
+        );
+
       } catch {
+
         setProfileIntel(null);
+
       }
 
     } catch (error) {
 
-      console.error(error);
+      console.error(
+        "Search failed:",
+        error,
+      );
 
       setStatus(
         "Search failed. Check backend health and API configuration.",
@@ -500,8 +739,13 @@ function App() {
       setLoading(false);
 
     }
+
   }
 
+
+  // ==========================================================
+  // SELECT OPPORTUNITY
+  // ==========================================================
 
   async function selectOpportunity(
     opportunity: Opportunity,
@@ -511,6 +755,7 @@ function App() {
       opportunity,
     );
 
+
     setMatch(null);
 
     setWhyNot(null);
@@ -518,12 +763,16 @@ function App() {
     setPreparation(null);
 
     setFuturePath(null);
+
     setStrategy(null);
+
     setSimulation(null);
+
 
     setView(
       "dashboard",
     );
+
 
     const [
       matchResult,
@@ -539,6 +788,7 @@ function App() {
         ),
       ]);
 
+
     if (
       matchResult.status ===
       "fulfilled"
@@ -547,7 +797,16 @@ function App() {
       setMatch(
         matchResult.value,
       );
+
+    } else {
+
+      console.error(
+        "Match request failed:",
+        matchResult.reason,
+      );
+
     }
+
 
     if (
       whyNotResult.status ===
@@ -557,15 +816,29 @@ function App() {
       setWhyNot(
         whyNotResult.value,
       );
+
+    } else {
+
+      console.error(
+        "Why Not request failed:",
+        whyNotResult.reason,
+      );
+
     }
+
   }
 
+
+  // ==========================================================
+  // PREPARATION
+  // ==========================================================
 
   async function openPreparation() {
 
     if (!selected) {
       return;
     }
+
 
     setAnalysisLoading(true);
 
@@ -576,11 +849,16 @@ function App() {
           selected.id,
         );
 
-      setPreparation(data);
+
+      setPreparation(
+        data,
+      );
+
 
       setView(
         "preparation",
       );
+
 
       window.scrollTo({
         top: 0,
@@ -589,7 +867,9 @@ function App() {
 
     } catch (error) {
 
-      console.error(error);
+      console.error(
+        error,
+      );
 
       setStatus(
         "Could not generate the preparation plan.",
@@ -600,14 +880,20 @@ function App() {
       setAnalysisLoading(false);
 
     }
+
   }
 
+
+  // ==========================================================
+  // FUTURE PATH
+  // ==========================================================
 
   async function openFuturePath() {
 
     if (!selected) {
       return;
     }
+
 
     setAnalysisLoading(true);
 
@@ -618,11 +904,16 @@ function App() {
           selected.id,
         );
 
-      setFuturePath(data);
+
+      setFuturePath(
+        data,
+      );
+
 
       setView(
         "future",
       );
+
 
       window.scrollTo({
         top: 0,
@@ -631,7 +922,9 @@ function App() {
 
     } catch (error) {
 
-      console.error(error);
+      console.error(
+        error,
+      );
 
       setStatus(
         "Could not generate the future opportunity path.",
@@ -642,8 +935,13 @@ function App() {
       setAnalysisLoading(false);
 
     }
+
   }
 
+
+  // ==========================================================
+  // COMPARISON
+  // ==========================================================
 
   function toggleCompare(
     id: number,
@@ -660,7 +958,9 @@ function App() {
             (item) =>
               item !== id,
           );
+
         }
+
 
         if (
           current.length >= 3
@@ -671,14 +971,18 @@ function App() {
           );
 
           return current;
+
         }
+
 
         return [
           ...current,
           id,
         ];
+
       },
     );
+
   }
 
 
@@ -693,7 +997,9 @@ function App() {
       );
 
       return;
+
     }
+
 
     setAnalysisLoading(true);
 
@@ -704,6 +1010,7 @@ function App() {
           compareIds,
         );
 
+
       setComparison(
         Array.isArray(
           data.comparison,
@@ -712,9 +1019,11 @@ function App() {
           : [],
       );
 
+
       setView(
         "comparison",
       );
+
 
       window.scrollTo({
         top: 0,
@@ -723,7 +1032,9 @@ function App() {
 
     } catch (error) {
 
-      console.error(error);
+      console.error(
+        error,
+      );
 
       setStatus(
         "Comparison could not be generated.",
@@ -734,50 +1045,178 @@ function App() {
       setAnalysisLoading(false);
 
     }
+
   }
 
+
+  // ==========================================================
+  // READINESS SIMULATION
+  // ==========================================================
 
   async function runSimulation() {
-    if (!selected) return;
-    const skills = simulationSkills.split(",").map((s) => s.trim()).filter(Boolean);
-    try {
-      setAnalysisLoading(true);
-      setSimulation(await simulateReadiness(selected.id, skills, simulationProjects));
-    } catch (error) {
-      console.error(error);
-      setStatus("Readiness simulation could not be generated.");
-    } finally {
-      setAnalysisLoading(false);
+
+    if (!selected) {
+      return;
     }
+
+
+    const skills =
+      simulationSkills
+        .split(",")
+        .map(
+          (skill) =>
+            skill.trim(),
+        )
+        .filter(Boolean);
+
+
+    try {
+
+      setAnalysisLoading(
+        true,
+      );
+
+
+      const result =
+        await simulateReadiness(
+          selected.id,
+          skills,
+          simulationProjects,
+        );
+
+
+      setSimulation(
+        result,
+      );
+
+    } catch (error) {
+
+      console.error(
+        error,
+      );
+
+      setStatus(
+        "Readiness simulation could not be generated.",
+      );
+
+    } finally {
+
+      setAnalysisLoading(
+        false,
+      );
+
+    }
+
   }
 
-  async function handleResumeUpload(file: File) {
+
+  // ==========================================================
+  // RESUME
+  // ==========================================================
+
+  async function handleResumeUpload(
+    file: File,
+  ) {
+
     try {
-      setResumeLoading(true);
-      const text = await file.text();
-      const parsed = await parseResume(text);
-      setResumeResult(parsed);
-      setStatus("Resume analysed. Extracted profile evidence is ready to review.");
+
+      setResumeLoading(
+        true,
+      );
+
+
+      const text =
+        await file.text();
+
+
+      const parsed =
+        await parseResume(
+          text,
+        );
+
+
+      setResumeResult(
+        parsed,
+      );
+
+
+      setStatus(
+        "Resume analysed. Extracted profile evidence is ready to review.",
+      );
+
     } catch (error) {
-      console.error(error);
-      setStatus("Resume analysis failed. Check the backend resume parser.");
+
+      console.error(
+        error,
+      );
+
+      setStatus(
+        "Resume analysis failed. Check the backend resume parser.",
+      );
+
     } finally {
-      setResumeLoading(false);
+
+      setResumeLoading(
+        false,
+      );
+
     }
+
   }
+
+
+  // ==========================================================
+  // APPLICATION STRATEGY
+  // ==========================================================
 
   async function openApplicationStrategy() {
-    if (!selected) return;
-    try {
-      setStrategyLoading(true);
-      setStrategy(await getApplicationStrategy(selected.id));
-    } catch (error) {
-      console.error(error);
-      setStatus("Application strategy could not be generated.");
-    } finally {
-      setStrategyLoading(false);
+
+    if (!selected) {
+      return;
     }
+
+
+    try {
+
+      setStrategyLoading(
+        true,
+      );
+
+
+      const result =
+        await getApplicationStrategy(
+          selected.id,
+        );
+
+
+      setStrategy(
+        result,
+      );
+
+    } catch (error) {
+
+      console.error(
+        error,
+      );
+
+      setStatus(
+        "Application strategy could not be generated.",
+      );
+
+    } finally {
+
+      setStrategyLoading(
+        false,
+      );
+
+    }
+
   }
+
+
+  // ==========================================================
+  // APPLY
+  // ==========================================================
 
   function claim(
     opportunity: Opportunity,
@@ -787,6 +1226,7 @@ function App() {
       opportunity.application_url ||
       opportunity.source_url;
 
+
     if (!url) {
 
       setStatus(
@@ -794,15 +1234,22 @@ function App() {
       );
 
       return;
+
     }
+
 
     window.open(
       url,
       "_blank",
       "noopener,noreferrer",
     );
+
   }
 
+
+  // ==========================================================
+  // BACK TO DASHBOARD
+  // ==========================================================
 
   function backToDashboard() {
 
@@ -810,12 +1257,18 @@ function App() {
       "dashboard",
     );
 
+
     window.scrollTo({
       top: 0,
       behavior: "smooth",
     });
+
   }
 
+
+  // ==========================================================
+  // PIPELINE METRICS
+  // ==========================================================
 
   const pipeline = {
 
@@ -847,8 +1300,13 @@ function App() {
       selected
         ? 1
         : 0,
+
   };
 
+
+  // ==========================================================
+  // BACK BUTTON
+  // ==========================================================
 
   function BackButton() {
 
@@ -864,8 +1322,13 @@ function App() {
 
       </button>
     );
+
   }
 
+
+  // ==========================================================
+  // PREPARATION VIEW
+  // ==========================================================
 
   if (
     view === "preparation"
@@ -905,17 +1368,15 @@ function App() {
 
                 </div>
 
+
                 <h1 className="mt-5 text-3xl font-semibold">
-
                   Preparation Roadmap
-
                 </h1>
 
-                <p className="mt-3 text-sm text-zinc-400">
 
+                <p className="mt-3 text-sm text-zinc-400">
                   {selected?.title ||
                     preparation?.opportunity}
-
                 </p>
 
               </div>
@@ -924,15 +1385,11 @@ function App() {
               <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.06] px-6 py-5 text-center">
 
                 <div className="text-4xl font-semibold text-cyan-300">
-
                   {preparation?.readiness_percentage ?? 0}%
-
                 </div>
 
                 <div className="mt-1 text-xs text-zinc-500">
-
                   CURRENT READINESS
-
                 </div>
 
               </div>
@@ -952,19 +1409,20 @@ function App() {
 
                 </div>
 
+
                 <div className="mt-4 flex flex-wrap gap-2">
 
-                  {(preparation?.current_skills || []).map(
-                    (skill, index) => (
-
-                      <span
-                        key={`${skill}-${index}`}
-                        className="rounded-lg bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-200"
-                      >
-                        {skill}
-                      </span>
-                    ),
-                  )}
+                  {(preparation?.current_skills || [])
+                    .map(
+                      (skill, index) => (
+                        <span
+                          key={`${skill}-${index}`}
+                          className="rounded-lg bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-200"
+                        >
+                          {skill}
+                        </span>
+                      ),
+                    )}
 
                 </div>
 
@@ -981,19 +1439,20 @@ function App() {
 
                 </div>
 
+
                 <div className="mt-4 flex flex-wrap gap-2">
 
-                  {(preparation?.missing_skills || []).map(
-                    (skill, index) => (
-
-                      <span
-                        key={`${skill}-${index}`}
-                        className="rounded-lg bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200"
-                      >
-                        {skill}
-                      </span>
-                    ),
-                  )}
+                  {(preparation?.missing_skills || [])
+                    .map(
+                      (skill, index) => (
+                        <span
+                          key={`${skill}-${index}`}
+                          className="rounded-lg bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200"
+                        >
+                          {skill}
+                        </span>
+                      ),
+                    )}
 
                 </div>
 
@@ -1005,100 +1464,91 @@ function App() {
             <div className="mt-10">
 
               <h2 className="text-2xl font-semibold">
-
                 Close the gap step by step
-
               </h2>
 
 
               <div className="mt-6 space-y-5">
 
-                {(preparation?.roadmap || []).map(
-                  (item, index) => (
+                {(preparation?.roadmap || [])
+                  .map(
+                    (item, index) => (
 
-                    <div
-                      key={`${item.skill}-${index}`}
-                      className="rounded-2xl border border-white/8 bg-white/[0.025] p-5"
-                    >
+                      <div
+                        key={`${item.skill}-${index}`}
+                        className="rounded-2xl border border-white/8 bg-white/[0.025] p-5"
+                      >
 
-                      <div className="flex justify-between gap-4">
+                        <div className="flex justify-between gap-4">
 
-                        <div>
+                          <div>
 
-                          <div className="text-xs text-zinc-500">
+                            <div className="text-xs text-zinc-500">
+                              STEP {index + 1}
+                            </div>
 
-                            STEP {index + 1}
+                            <h3 className="mt-1 text-xl font-semibold text-cyan-100">
+                              {item.skill}
+                            </h3>
 
                           </div>
 
-                          <h3 className="mt-1 text-xl font-semibold text-cyan-100">
 
-                            {item.skill}
-
-                          </h3>
+                          {item.priority && (
+                            <span className="h-fit rounded-full bg-violet-500/10 px-3 py-1 text-xs text-violet-200">
+                              {item.priority} priority
+                            </span>
+                          )}
 
                         </div>
 
 
-                        {item.priority && (
+                        {(item.steps || []).length > 0 && (
 
-                          <span className="h-fit rounded-full bg-violet-500/10 px-3 py-1 text-xs text-violet-200">
+                          <div className="mt-5 grid gap-2 sm:grid-cols-2">
 
-                            {item.priority} priority
+                            {(item.steps || [])
+                              .map(
+                                (
+                                  step,
+                                  stepIndex,
+                                ) => (
 
-                          </span>
+                                  <div
+                                    key={`${step}-${stepIndex}`}
+                                    className="rounded-xl bg-black/20 p-3 text-sm text-zinc-300"
+                                  >
+                                    {stepIndex + 1}. {step}
+                                  </div>
+
+                                ),
+                              )}
+
+                          </div>
+
+                        )}
+
+
+                        {item.project && (
+
+                          <div className="mt-5 rounded-xl border border-cyan-300/10 bg-cyan-300/[0.04] p-4">
+
+                            <div className="text-xs uppercase tracking-wider text-cyan-200">
+                              Portfolio mission
+                            </div>
+
+                            <p className="mt-2 text-sm text-zinc-400">
+                              {item.project}
+                            </p>
+
+                          </div>
 
                         )}
 
                       </div>
 
-
-                      {(item.steps || []).length > 0 && (
-
-                        <div className="mt-5 grid gap-2 sm:grid-cols-2">
-
-                          {(item.steps || []).map(
-                            (step, stepIndex) => (
-
-                              <div
-                                key={`${step}-${stepIndex}`}
-                                className="rounded-xl bg-black/20 p-3 text-sm text-zinc-300"
-                              >
-
-                                {stepIndex + 1}. {step}
-
-                              </div>
-                            ),
-                          )}
-
-                        </div>
-
-                      )}
-
-
-                      {item.project && (
-
-                        <div className="mt-5 rounded-xl border border-cyan-300/10 bg-cyan-300/[0.04] p-4">
-
-                          <div className="text-xs uppercase tracking-wider text-cyan-200">
-
-                            Portfolio mission
-
-                          </div>
-
-                          <p className="mt-2 text-sm text-zinc-400">
-
-                            {item.project}
-
-                          </p>
-
-                        </div>
-
-                      )}
-
-                    </div>
-                  ),
-                )}
+                    ),
+                  )}
 
               </div>
 
@@ -1110,8 +1560,13 @@ function App() {
 
       </main>
     );
+
   }
 
+
+  // ==========================================================
+  // FUTURE VIEW
+  // ==========================================================
 
   if (
     view === "future"
@@ -1149,16 +1604,14 @@ function App() {
 
               </div>
 
+
               <h1 className="mt-5 text-3xl font-semibold">
-
                 Your Future Opportunity Path
-
               </h1>
 
+
               <p className="mt-4 text-sm leading-7 text-zinc-400">
-
                 {futurePath?.message}
-
               </p>
 
             </div>
@@ -1166,150 +1619,138 @@ function App() {
 
             <div className="mt-10 space-y-6">
 
-              {(futurePath?.future_path || []).map(
-                (item, index) => (
+              {(futurePath?.future_path || [])
+                .map(
+                  (item, index) => (
 
-                  <div
-                    key={`${item.skill}-${index}`}
-                    className="rounded-2xl border border-white/8 bg-white/[0.025] p-6"
-                  >
+                    <div
+                      key={`${item.skill}-${index}`}
+                      className="rounded-2xl border border-white/8 bg-white/[0.025] p-6"
+                    >
 
-                    <div className="flex justify-between gap-4">
+                      <div className="flex justify-between gap-4">
 
-                      <div>
+                        <div>
 
-                        <div className="text-xs uppercase tracking-wider text-zinc-500">
+                          <div className="text-xs uppercase tracking-wider text-zinc-500">
+                            Growth Phase {index + 1}
+                          </div>
 
-                          Growth Phase {index + 1}
+                          <h2 className="mt-2 text-2xl font-semibold text-violet-100">
+                            {item.skill}
+                          </h2>
 
                         </div>
 
-                        <h2 className="mt-2 text-2xl font-semibold text-violet-100">
 
-                          {item.skill}
+                        {item.priority && (
 
-                        </h2>
+                          <span className="h-fit rounded-full bg-violet-500/10 px-3 py-1 text-xs text-violet-200">
+                            {item.priority}
+                          </span>
+
+                        )}
 
                       </div>
 
 
-                      {item.priority && (
+                      <p className="mt-5 text-sm leading-7 text-zinc-400">
+                        {item.goal}
+                      </p>
 
-                        <span className="h-fit rounded-full bg-violet-500/10 px-3 py-1 text-xs text-violet-200">
 
-                          {item.priority}
+                      {item.why_it_matters && (
 
-                        </span>
+                        <div className="mt-5 rounded-xl bg-violet-500/[0.06] p-4">
+
+                          <div className="text-xs uppercase tracking-wider text-violet-200">
+                            Why this matters
+                          </div>
+
+                          <p className="mt-2 text-sm text-zinc-400">
+                            {item.why_it_matters}
+                          </p>
+
+                        </div>
+
+                      )}
+
+
+                      {(item.milestones || []).length > 0 && (
+
+                        <div className="mt-5">
+
+                          <div className="text-xs uppercase tracking-wider text-zinc-500">
+                            Milestones
+                          </div>
+
+                          <div className="mt-3 space-y-2">
+
+                            {(item.milestones || [])
+                              .map(
+                                (
+                                  milestone,
+                                  milestoneIndex,
+                                ) => (
+
+                                  <div
+                                    key={`${milestone}-${milestoneIndex}`}
+                                    className="flex gap-3 rounded-xl bg-black/20 p-3 text-sm text-zinc-300"
+                                  >
+
+                                    <ChevronRight className="h-4 w-4 shrink-0 text-violet-300" />
+
+                                    {milestone}
+
+                                  </div>
+
+                                ),
+                              )}
+
+                          </div>
+
+                        </div>
+
+                      )}
+
+
+                      {(item.projects || []).length > 0 && (
+
+                        <div className="mt-5">
+
+                          <div className="text-xs uppercase tracking-wider text-zinc-500">
+                            Portfolio Proof
+                          </div>
+
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+
+                            {(item.projects || [])
+                              .map(
+                                (
+                                  project,
+                                  projectIndex,
+                                ) => (
+
+                                  <div
+                                    key={`${project}-${projectIndex}`}
+                                    className="rounded-xl border border-cyan-300/10 bg-cyan-300/[0.04] p-4 text-sm text-zinc-300"
+                                  >
+                                    {project}
+                                  </div>
+
+                                ),
+                              )}
+
+                          </div>
+
+                        </div>
 
                       )}
 
                     </div>
 
-
-                    <p className="mt-5 text-sm leading-7 text-zinc-400">
-
-                      {item.goal}
-
-                    </p>
-
-
-                    {item.why_it_matters && (
-
-                      <div className="mt-5 rounded-xl bg-violet-500/[0.06] p-4">
-
-                        <div className="text-xs uppercase tracking-wider text-violet-200">
-
-                          Why this matters
-
-                        </div>
-
-                        <p className="mt-2 text-sm text-zinc-400">
-
-                          {item.why_it_matters}
-
-                        </p>
-
-                      </div>
-
-                    )}
-
-
-                    {(item.milestones || []).length > 0 && (
-
-                      <div className="mt-5">
-
-                        <div className="text-xs uppercase tracking-wider text-zinc-500">
-
-                          Milestones
-
-                        </div>
-
-                        <div className="mt-3 space-y-2">
-
-                          {(item.milestones || []).map(
-                            (
-                              milestone,
-                              milestoneIndex,
-                            ) => (
-
-                              <div
-                                key={`${milestone}-${milestoneIndex}`}
-                                className="flex gap-3 rounded-xl bg-black/20 p-3 text-sm text-zinc-300"
-                              >
-
-                                <ChevronRight className="h-4 w-4 shrink-0 text-violet-300" />
-
-                                {milestone}
-
-                              </div>
-                            ),
-                          )}
-
-                        </div>
-
-                      </div>
-
-                    )}
-
-
-                    {(item.projects || []).length > 0 && (
-
-                      <div className="mt-5">
-
-                        <div className="text-xs uppercase tracking-wider text-zinc-500">
-
-                          Portfolio Proof
-
-                        </div>
-
-                        <div className="mt-3 grid gap-3 md:grid-cols-2">
-
-                          {(item.projects || []).map(
-                            (
-                              project,
-                              projectIndex,
-                            ) => (
-
-                              <div
-                                key={`${project}-${projectIndex}`}
-                                className="rounded-xl border border-cyan-300/10 bg-cyan-300/[0.04] p-4 text-sm text-zinc-300"
-                              >
-
-                                {project}
-
-                              </div>
-                            ),
-                          )}
-
-                        </div>
-
-                      </div>
-
-                    )}
-
-                  </div>
-                ),
-              )}
+                  ),
+                )}
 
             </div>
 
@@ -1319,8 +1760,13 @@ function App() {
 
       </main>
     );
+
   }
 
+
+  // ==========================================================
+  // COMPARISON VIEW
+  // ==========================================================
 
   if (
     view === "comparison"
@@ -1349,21 +1795,18 @@ function App() {
           <div className="glass rounded-3xl p-6 sm:p-8">
 
             <h1 className="text-3xl font-semibold">
-
               Opportunity Comparison
-
             </h1>
 
+
             <p className="mt-3 text-sm text-zinc-400">
-
               Compare profile fit, source confidence and application timing before deciding where to focus.
-
             </p>
 
 
             <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
 
-              {comparison.map(
+              {safeComparison.map(
                 (item, index) => (
 
                   <div
@@ -1372,15 +1815,12 @@ function App() {
                   >
 
                     <div className="text-xs uppercase tracking-wider text-zinc-500">
-
                       {item.organization}
-
                     </div>
 
+
                     <h2 className="mt-2 text-lg font-semibold">
-
                       {item.title}
-
                     </h2>
 
 
@@ -1389,15 +1829,11 @@ function App() {
                       <div className="rounded-xl bg-cyan-300/[0.06] p-4">
 
                         <div className="text-2xl font-semibold text-cyan-300">
-
                           {item.match_score}%
-
                         </div>
 
                         <div className="text-xs text-zinc-500">
-
                           Profile Match
-
                         </div>
 
                       </div>
@@ -1406,15 +1842,11 @@ function App() {
                       <div className="rounded-xl bg-violet-500/[0.06] p-4">
 
                         <div className="text-2xl font-semibold text-violet-200">
-
                           {item.trust_score}%
-
                         </div>
 
                         <div className="text-xs text-zinc-500">
-
                           Trust
-
                         </div>
 
                       </div>
@@ -1425,21 +1857,18 @@ function App() {
                     <div className="mt-5 rounded-xl bg-black/20 p-4">
 
                       <div className="text-xs uppercase tracking-wider text-zinc-500">
-
                         Deadline
-
                       </div>
 
                       <div className="mt-2 text-sm text-zinc-300">
-
                         {item.deadline ||
                           "Not specified"}
-
                       </div>
 
                     </div>
 
                   </div>
+
                 ),
               )}
 
@@ -1451,11 +1880,18 @@ function App() {
 
       </main>
     );
+
   }
 
 
+  // ==========================================================
+  // MAIN DASHBOARD
+  // ==========================================================
+
   return (
     <main className="min-h-screen bg-[#0a0a0c] text-white">
+
+      {/* HEADER */}
 
       <header className="sticky top-0 z-50 border-b border-white/8 bg-[#0a0a0c]/85 backdrop-blur-xl">
 
@@ -1469,18 +1905,15 @@ function App() {
 
             </div>
 
+
             <div>
 
               <div className="font-semibold">
-
                 Student Opportunity Engine
-
               </div>
 
               <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">
-
                 Opportunity Intelligence
-
               </div>
 
             </div>
@@ -1513,9 +1946,7 @@ function App() {
               }
               className="rounded-xl border border-white/10 px-4 py-2 text-sm text-zinc-200"
             >
-
               Edit Profile
-
             </button>
 
           </div>
@@ -1524,6 +1955,8 @@ function App() {
 
       </header>
 
+
+      {/* HERO */}
 
       <section className="grid-background border-b border-white/5">
 
@@ -1545,9 +1978,7 @@ function App() {
               Fuel Your Future.
 
               <span className="block text-cyan-300">
-
                 Discover Better Opportunities.
-
               </span>
 
             </h1>
@@ -1563,6 +1994,8 @@ function App() {
 
             </p>
 
+
+            {/* SEARCH */}
 
             <div className="mt-10 glass rounded-2xl p-3">
 
@@ -1587,19 +2020,17 @@ function App() {
 
 
                 <button
-                  onClick={launchEngine}
+                  onClick={() =>
+                    void launchEngine()
+                  }
                   disabled={loading}
                   className="neon-button flex min-h-12 items-center justify-center gap-2 rounded-xl px-6 font-semibold disabled:opacity-60"
                 >
 
                   {loading ? (
-
                     <LoaderCircle className="h-5 w-5 animate-spin" />
-
                   ) : (
-
                     <Activity className="h-5 w-5" />
-
                   )}
 
                   {loading
@@ -1627,10 +2058,9 @@ function App() {
                           : "bg-white/[0.04] text-zinc-400"
                       }`}
                     >
-
                       {item}
-
                     </button>
+
                   ),
                 )}
 
@@ -1654,36 +2084,47 @@ function App() {
       </section>
 
 
+      {/* PIPELINE */}
+
       <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
           {[
-            ["Discovered", pipeline.discovered],
-            ["Strong Matches", pipeline.strongMatches],
-            ["Deadline Pressure", pipeline.urgent],
-            ["Currently Analysing", pipeline.selected],
+            [
+              "Discovered",
+              pipeline.discovered,
+            ],
+            [
+              "Strong Matches",
+              pipeline.strongMatches,
+            ],
+            [
+              "Deadline Pressure",
+              pipeline.urgent,
+            ],
+            [
+              "Currently Analysing",
+              pipeline.selected,
+            ],
           ].map(
             ([label, value], index) => (
 
               <div
-                key={`${label}-${index}`}
+                key={`${String(label)}-${index}`}
                 className="glass rounded-2xl p-5"
               >
 
                 <div className="text-xs uppercase tracking-[0.16em] text-zinc-500">
-
-                  {label}
-
+                  {String(label)}
                 </div>
 
                 <div className="mt-4 text-3xl font-semibold">
-
-                  {value}
-
+                  {String(value)}
                 </div>
 
               </div>
+
             ),
           )}
 
@@ -1692,6 +2133,8 @@ function App() {
       </section>
 
 
+      {/* OPPORTUNITIES */}
+
       <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">
 
         <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
@@ -1699,22 +2142,20 @@ function App() {
           <div>
 
             <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-
               Ranked Live Feed
-
             </p>
 
             <h2 className="mt-2 text-3xl font-semibold">
-
               Opportunities worth your attention
-
             </h2>
 
           </div>
 
 
           <button
-            onClick={runComparison}
+            onClick={() =>
+              void runComparison()
+            }
             disabled={
               compareIds.length < 2 ||
               analysisLoading
@@ -1733,6 +2174,8 @@ function App() {
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
 
+          {/* OPPORTUNITY LIST */}
+
           <div className="space-y-4">
 
             {filtered.map(
@@ -1745,15 +2188,18 @@ function App() {
                   selected?.id ===
                   opportunity.id;
 
+
                 const comparing =
                   compareIds.includes(
                     opportunity.id,
                   );
 
+
                 const trustScore =
                   getTrustScore(
                     opportunity,
                   );
+
 
                 return (
 
@@ -1773,10 +2219,8 @@ function App() {
                         <div className="mb-3 flex flex-wrap gap-2">
 
                           <span className="rounded-full bg-cyan-300/10 px-3 py-1 text-[11px] text-cyan-200">
-
                             {opportunity.type ||
                               "Opportunity"}
-
                           </span>
 
 
@@ -1792,25 +2236,20 @@ function App() {
 
 
                         <h3 className="text-lg font-semibold">
-
                           {opportunity.title}
-
                         </h3>
 
 
                         <p className="mt-1 text-sm text-zinc-500">
-
                           {opportunity.organization ||
+                            opportunity.company ||
                             "Unknown organization"}
-
                         </p>
 
 
                         <p className="mt-4 text-sm leading-6 text-zinc-400">
-
                           {opportunity.description ||
                             "No description available."}
-
                         </p>
 
 
@@ -1828,10 +2267,9 @@ function App() {
                                   key={`${skill}-${skillIndex}`}
                                   className="rounded-lg border border-white/8 px-2 py-1 text-xs text-zinc-400"
                                 >
-
                                   {skill}
-
                                 </span>
+
                               ),
                             )}
 
@@ -1852,31 +2290,25 @@ function App() {
 
 
                         <div className="mt-3 text-xs text-zinc-600">
-
                           {formatTrustLabel(
                             trustScore,
                           )}
-
                         </div>
 
                       </div>
 
 
-                      <div className="flex min-w-[140px] flex-col gap-2">
+                      <div className="flex min-w-[150px] flex-col gap-2">
 
                         <div className="rounded-xl bg-black/20 p-3 text-center">
 
                           <div className="text-2xl font-semibold text-cyan-300">
-
                             {opportunity.match_score ||
                               0}%
-
                           </div>
 
                           <div className="text-[10px] text-zinc-600">
-
                             MATCH
-
                           </div>
 
                         </div>
@@ -1884,15 +2316,25 @@ function App() {
 
                         <button
                           onClick={() =>
-                            selectOpportunity(
+                            void selectOpportunity(
                               opportunity,
                             )
                           }
                           className="rounded-xl border border-white/10 px-3 py-2 text-xs"
                         >
-
                           Analyse
+                        </button>
 
+
+                        <button
+                          onClick={() =>
+                            void openWorkspace(
+                              opportunity,
+                            )
+                          }
+                          className="rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-3 py-2 text-xs font-semibold text-cyan-200"
+                        >
+                          Open Workspace
                         </button>
 
 
@@ -1904,9 +2346,7 @@ function App() {
                           }
                           className="rounded-xl bg-cyan-300 px-3 py-2 text-xs font-semibold text-black"
                         >
-
                           Apply
-
                         </button>
 
 
@@ -1934,12 +2374,41 @@ function App() {
                     </div>
 
                   </article>
+
                 );
+
               },
+            )}
+
+
+            {filtered.length === 0 && (
+
+              <div className="glass rounded-2xl p-8 text-center">
+
+                <Radar className="mx-auto h-8 w-8 text-zinc-600" />
+
+                <p className="mt-4 text-sm text-zinc-500">
+                  No opportunities match your current search.
+                </p>
+
+                <button
+                  onClick={() => {
+                    setQuery("");
+                    setFilter("All");
+                  }}
+                  className="mt-4 rounded-xl border border-white/10 px-4 py-2 text-xs text-zinc-300"
+                >
+                  Clear filters
+                </button>
+
+              </div>
+
             )}
 
           </div>
 
+
+          {/* SMART MATCH SIDEBAR */}
 
           <aside className="space-y-4 lg:sticky lg:top-24 lg:h-fit">
 
@@ -1953,18 +2422,15 @@ function App() {
 
                 </div>
 
+
                 <div>
 
                   <div className="text-xs uppercase tracking-[0.18em] text-zinc-500">
-
                     Smart Match
-
                   </div>
 
                   <div className="text-sm text-zinc-300">
-
                     Explainable profile intelligence
-
                   </div>
 
                 </div>
@@ -1977,45 +2443,42 @@ function App() {
                 <>
 
                   <h3 className="mt-6 font-semibold">
-
                     {selected.title}
-
                   </h3>
 
 
                   <div className="mt-5 text-5xl font-semibold text-cyan-300">
-
-                    {match?.match_score || 0}%
-
+                    {match?.match_score ||
+                      selected.match_score ||
+                      0}%
                   </div>
 
 
                   <div className="mt-5">
 
                     <div className="text-xs uppercase tracking-wider text-zinc-500">
-
                       Skills you match
-
                     </div>
+
 
                     <div className="mt-3 flex flex-wrap gap-2">
 
-                      {(match?.matched_skills || []).map(
-                        (
-                          skill,
-                          index,
-                        ) => (
+                      {(match?.matched_skills || [])
+                        .map(
+                          (
+                            skill,
+                            index,
+                          ) => (
 
-                          <span
-                            key={`${skill}-${index}`}
-                            className="rounded-lg bg-emerald-400/10 px-2 py-1 text-xs text-emerald-200"
-                          >
+                            <span
+                              key={`${skill}-${index}`}
+                              className="rounded-lg bg-emerald-400/10 px-2 py-1 text-xs text-emerald-200"
+                            >
+                              {skill}
+                            </span>
 
-                            {skill}
-
-                          </span>
-                        ),
-                      )}
+                          ),
+                        )}
 
                     </div>
 
@@ -2025,29 +2488,28 @@ function App() {
                   <div className="mt-5">
 
                     <div className="text-xs uppercase tracking-wider text-zinc-500">
-
                       Skill gaps
-
                     </div>
+
 
                     <div className="mt-3 flex flex-wrap gap-2">
 
-                      {(match?.missing_skills || []).map(
-                        (
-                          skill,
-                          index,
-                        ) => (
+                      {(match?.missing_skills || [])
+                        .map(
+                          (
+                            skill,
+                            index,
+                          ) => (
 
-                          <span
-                            key={`${skill}-${index}`}
-                            className="rounded-lg bg-amber-400/10 px-2 py-1 text-xs text-amber-200"
-                          >
+                            <span
+                              key={`${skill}-${index}`}
+                              className="rounded-lg bg-amber-400/10 px-2 py-1 text-xs text-amber-200"
+                            >
+                              {skill}
+                            </span>
 
-                            {skill}
-
-                          </span>
-                        ),
-                      )}
+                          ),
+                        )}
 
                     </div>
 
@@ -2057,24 +2519,45 @@ function App() {
                   <div className="mt-6 space-y-2">
 
                     <button
-                      onClick={openPreparation}
-                      disabled={analysisLoading}
-                      className="neon-button w-full rounded-xl px-4 py-3 text-sm font-semibold"
+                      onClick={() =>
+                        void openWorkspace(
+                          selected,
+                        )
+                      }
+                      disabled={
+                        workspaceLoading
+                      }
+                      className="w-full rounded-xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-semibold text-cyan-200"
                     >
-
-                      Build Preparation Plan
-
+                      {workspaceLoading
+                        ? "Loading Workspace..."
+                        : "Open Opportunity Workspace"}
                     </button>
 
 
                     <button
-                      onClick={openFuturePath}
-                      disabled={analysisLoading}
+                      onClick={() =>
+                        void openPreparation()
+                      }
+                      disabled={
+                        analysisLoading
+                      }
+                      className="neon-button w-full rounded-xl px-4 py-3 text-sm font-semibold"
+                    >
+                      Build Preparation Plan
+                    </button>
+
+
+                    <button
+                      onClick={() =>
+                        void openFuturePath()
+                      }
+                      disabled={
+                        analysisLoading
+                      }
                       className="w-full rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-200"
                     >
-
                       Show Future Path
-
                     </button>
 
                   </div>
@@ -2085,10 +2568,9 @@ function App() {
                     <div className="mt-6 border-t border-white/8 pt-5">
 
                       <div className="text-xs uppercase tracking-wider text-zinc-500">
-
                         What is holding you back
-
                       </div>
+
 
                       <div className="mt-3 space-y-2">
 
@@ -2104,10 +2586,9 @@ function App() {
                                 key={`${blocker}-${index}`}
                                 className="text-sm text-zinc-400"
                               >
-
                                 • {blocker}
-
                               </div>
+
                             ),
                           )}
 
@@ -2122,9 +2603,7 @@ function App() {
               ) : (
 
                 <p className="mt-6 text-sm text-zinc-500">
-
                   Select an opportunity to analyse your fit.
-
                 </p>
 
               )}
@@ -2132,19 +2611,20 @@ function App() {
             </div>
 
 
-            {(hidden || []).length > 0 && (
+            {/* HIDDEN SIGNALS */}
+
+            {safeHidden.length > 0 && (
 
               <div className="glass rounded-2xl p-5">
 
                 <div className="text-xs uppercase tracking-[0.18em] text-zinc-500">
-
                   Opportunity Signals
-
                 </div>
+
 
                 <div className="mt-4 space-y-3">
 
-                  {hidden
+                  {safeHidden
                     .slice(0, 3)
                     .map(
                       (
@@ -2158,18 +2638,15 @@ function App() {
                         >
 
                           <div className="text-xs text-cyan-200">
-
                             {item.type}
-
                           </div>
 
                           <div className="mt-1 text-xs leading-5 text-zinc-500">
-
                             {item.reason}
-
                           </div>
 
                         </div>
+
                       ),
                     )}
 
@@ -2186,88 +2663,508 @@ function App() {
       </section>
 
 
+      {/* WORKSPACE */}
+
+      {workspaceOpen && (
+
+        <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">
+
+          <OpportunityWorkspace
+            data={workspace}
+            loading={workspaceLoading}
+            onClose={() => {
+              setWorkspaceOpen(false);
+              setWorkspace(null);
+            }}
+          />
+
+        </section>
+
+      )}
+
+
+      {/* PROFILE INTELLIGENCE */}
+
       <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">
+
         <div className="grid gap-5 lg:grid-cols-3">
+
           <div className="glass rounded-2xl p-5 lg:col-span-2">
+
             <div className="flex items-center justify-between gap-4">
+
               <div>
-                <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Profile Intelligence</p>
-                <h2 className="mt-2 text-xl font-semibold">What your opportunity history is telling you</h2>
+
+                <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                  Profile Intelligence
+                </p>
+
+                <h2 className="mt-2 text-xl font-semibold">
+                  What your opportunity history is telling you
+                </h2>
+
               </div>
+
+
               {profileIntel?.best_skill_investment && (
+
                 <div className="rounded-xl bg-cyan-300/10 px-3 py-2 text-right">
-                  <div className="text-[10px] uppercase tracking-wider text-zinc-500">Best skill investment</div>
-                  <div className="text-sm font-semibold text-cyan-200">{profileIntel.best_skill_investment.skill}</div>
+
+                  <div className="text-[10px] uppercase tracking-wider text-zinc-500">
+                    Best skill investment
+                  </div>
+
+                  <div className="text-sm font-semibold text-cyan-200">
+                    {profileIntel.best_skill_investment.skill}
+                  </div>
+
                 </div>
+
               )}
+
             </div>
+
+
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
+
               <div className="rounded-xl bg-white/[0.03] p-4">
-                <div className="text-xs text-zinc-500">Recurring profile weaknesses</div>
-                <div className="mt-3 space-y-2">
-                  {(profileIntel?.profile_weaknesses || ["Run the engine to generate profile intelligence."]).slice(0, 4).map((x, i) => <div key={`${x}-${i}`} className="text-sm text-zinc-300">• {x}</div>)}
+
+                <div className="text-xs text-zinc-500">
+                  Recurring profile weaknesses
                 </div>
+
+
+                <div className="mt-3 space-y-2">
+
+                  {(profileIntel?.profile_weaknesses ||
+                    [
+                      "Run the engine to generate profile intelligence.",
+                    ])
+                    .slice(0, 4)
+                    .map(
+                      (
+                        item,
+                        index,
+                      ) => (
+
+                        <div
+                          key={`${item}-${index}`}
+                          className="text-sm text-zinc-300"
+                        >
+                          • {item}
+                        </div>
+
+                      ),
+                    )}
+
+                </div>
+
               </div>
+
+
               <div className="rounded-xl bg-white/[0.03] p-4">
-                <div className="text-xs text-zinc-500">Skill proof score</div>
-                <div className="mt-3 space-y-2">
-                  {(profileIntel?.skill_proof || []).slice(0, 4).map((x) => <div key={x.skill} className="flex items-center justify-between text-sm"><span className="text-zinc-300">{x.skill}</span><span className="text-cyan-300">{x.proof_score}%</span></div>)}
+
+                <div className="text-xs text-zinc-500">
+                  Skill proof score
                 </div>
+
+
+                <div className="mt-3 space-y-2">
+
+                  {(profileIntel?.skill_proof || [])
+                    .slice(0, 4)
+                    .map(
+                      (item) => (
+
+                        <div
+                          key={item.skill}
+                          className="flex items-center justify-between text-sm"
+                        >
+
+                          <span className="text-zinc-300">
+                            {item.skill}
+                          </span>
+
+                          <span className="text-cyan-300">
+                            {item.proof_score}%
+                          </span>
+
+                        </div>
+
+                      ),
+                    )}
+
+                </div>
+
               </div>
+
             </div>
+
+
             {profileIntel?.direction_drift?.detected && (
+
               <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/[0.04] p-4">
-                <div className="text-xs uppercase tracking-wider text-amber-200">Career Direction Drift Detected</div>
-                <p className="mt-2 text-sm text-zinc-300">{profileIntel.direction_drift.message}</p>
-                <p className="mt-2 text-xs text-zinc-500">{profileIntel.direction_drift.action}</p>
+
+                <div className="text-xs uppercase tracking-wider text-amber-200">
+                  Career Direction Drift Detected
+                </div>
+
+                <p className="mt-2 text-sm text-zinc-300">
+                  {profileIntel.direction_drift.message}
+                </p>
+
+                <p className="mt-2 text-xs text-zinc-500">
+                  {profileIntel.direction_drift.action}
+                </p>
+
               </div>
+
             )}
+
           </div>
+
 
           <div className="glass rounded-2xl p-5">
-            <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Opportunity Timeline</p>
-            <h2 className="mt-2 text-xl font-semibold">What to do next</h2>
+
+            <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+              Opportunity Timeline
+            </p>
+
+            <h2 className="mt-2 text-xl font-semibold">
+              What to do next
+            </h2>
+
+
             <div className="mt-5 space-y-3">
-              {[["Apply now", profileIntel?.timeline.apply_now.length || 0], ["Prepare this week", profileIntel?.timeline.prepare_this_week.length || 0], ["Prepare this month", profileIntel?.timeline.prepare_this_month.length || 0], ["Future targets", profileIntel?.timeline.future_targets.length || 0]].map(([label, value]) => <div key={String(label)} className="flex items-center justify-between rounded-xl bg-white/[0.03] p-3"><span className="text-sm text-zinc-300">{label}</span><span className="text-cyan-300">{value}</span></div>)}
+
+              {[
+                [
+                  "Apply now",
+                  profileIntel?.timeline?.apply_now?.length || 0,
+                ],
+                [
+                  "Prepare this week",
+                  profileIntel?.timeline?.prepare_this_week?.length || 0,
+                ],
+                [
+                  "Prepare this month",
+                  profileIntel?.timeline?.prepare_this_month?.length || 0,
+                ],
+                [
+                  "Future targets",
+                  profileIntel?.timeline?.future_targets?.length || 0,
+                ],
+              ].map(
+                ([label, value]) => (
+
+                  <div
+                    key={String(label)}
+                    className="flex items-center justify-between rounded-xl bg-white/[0.03] p-3"
+                  >
+
+                    <span className="text-sm text-zinc-300">
+                      {String(label)}
+                    </span>
+
+                    <span className="text-cyan-300">
+                      {String(value)}
+                    </span>
+
+                  </div>
+
+                ),
+              )}
+
             </div>
+
           </div>
+
         </div>
+
       </section>
+
+
+      {/* RESUME */}
 
       <section className="mx-auto max-w-7xl px-5 pb-10 lg:px-8">
+
         <div className="glass rounded-2xl p-5">
+
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <div><p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Resume-to-Opportunity Matching</p><h2 className="mt-2 text-xl font-semibold">Turn your resume into evidence</h2><p className="mt-1 text-sm text-zinc-500">Upload a text-readable resume and the existing backend parser will extract skills, projects and experience signals.</p></div>
-            <label className="cursor-pointer rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-200">{resumeLoading ? "Analysing..." : "Upload Resume"}<input type="file" accept=".txt,.md" className="hidden" disabled={resumeLoading} onChange={(e) => { const f=e.target.files?.[0]; if(f) void handleResumeUpload(f); }} /></label>
+
+            <div>
+
+              <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                Resume-to-Opportunity Matching
+              </p>
+
+              <h2 className="mt-2 text-xl font-semibold">
+                Turn your resume into evidence
+              </h2>
+
+              <p className="mt-1 text-sm text-zinc-500">
+                Upload a text-readable resume and the existing backend parser will extract skills, projects and experience signals.
+              </p>
+
+            </div>
+
+
+            <label className="cursor-pointer rounded-xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-200">
+
+              {resumeLoading
+                ? "Analysing..."
+                : "Upload Resume"}
+
+              <input
+                type="file"
+                accept=".txt,.md"
+                className="hidden"
+                disabled={resumeLoading}
+                onChange={(event) => {
+
+                  const file =
+                    event.target.files?.[0];
+
+                  if (file) {
+                    void handleResumeUpload(
+                      file,
+                    );
+                  }
+
+                }}
+              />
+
+            </label>
+
           </div>
-          {resumeResult && <pre className="mt-4 max-h-48 overflow-auto rounded-xl bg-black/30 p-4 text-xs text-zinc-300">{JSON.stringify(resumeResult, null, 2)}</pre>}
+
+
+          {resumeResult !== null && (
+
+            <pre className="mt-4 max-h-48 overflow-auto rounded-xl bg-black/30 p-4 text-xs text-zinc-300">
+              {JSON.stringify(
+                resumeResult,
+                null,
+                2,
+              )}
+            </pre>
+
+          )}
+
         </div>
+
       </section>
 
+
+      {/* SIMULATOR + STRATEGY */}
+
       {selected && (
+
         <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">
+
           <div className="grid gap-5 lg:grid-cols-2">
-            <div className="glass rounded-2xl p-5">
-              <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Opportunity Readiness Simulator</p>
-              <h2 className="mt-2 text-xl font-semibold">What if you improve your profile?</h2>
-              <p className="mt-2 text-sm text-zinc-500">Test skills before committing time to a preparation plan.</p>
-              <input value={simulationSkills} onChange={(e) => setSimulationSkills(e.target.value)} placeholder="Add skills, e.g. SQL, Docker" className="mt-4 w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none" />
-              <div className="mt-3 flex gap-3">
-                <input type="number" min="0" max="5" value={simulationProjects} onChange={(e) => setSimulationProjects(Number(e.target.value) || 0)} className="w-28 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none" />
-                <button onClick={runSimulation} disabled={analysisLoading} className="neon-button flex-1 rounded-xl px-4 py-3 text-sm font-semibold">Simulate Improvement</button>
-              </div>
-              {simulation && <div className="mt-5 grid grid-cols-2 gap-3"><div className="rounded-xl bg-white/[0.03] p-4"><div className="text-xs text-zinc-500">Readiness</div><div className="mt-1 text-2xl text-cyan-300">{simulation.current_readiness}% → {simulation.simulated_readiness}%</div></div><div className="rounded-xl bg-white/[0.03] p-4"><div className="text-xs text-zinc-500">New opportunities</div><div className="mt-1 text-2xl text-violet-200">+{simulation.unlocked_opportunities.length}</div></div></div>}
-            </div>
+
+            {/* SIMULATOR */}
 
             <div className="glass rounded-2xl p-5">
-              <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Personal Application Strategy</p>
-              <h2 className="mt-2 text-xl font-semibold">Prepare to apply intelligently</h2>
-              <button onClick={openApplicationStrategy} disabled={strategyLoading} className="mt-4 w-full rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-200">{strategyLoading ? "Generating..." : "Generate My Strategy"}</button>
-              {strategy && <div className="mt-5 space-y-4"><div><div className="text-xs text-zinc-500">Strongest selling points</div><div className="mt-2 flex flex-wrap gap-2">{strategy.strongest_selling_points.map((x, i) => <span key={`${x}-${i}`} className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200">{x}</span>)}</div></div><div><div className="text-xs text-zinc-500">Improve before applying</div><div className="mt-2 space-y-2">{strategy.improvements_before_applying.map((x, i) => <div key={`${x}-${i}`} className="text-sm text-zinc-300">• {x}</div>)}</div></div></div>}
+
+              <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                Opportunity Readiness Simulator
+              </p>
+
+              <h2 className="mt-2 text-xl font-semibold">
+                What if you improve your profile?
+              </h2>
+
+              <p className="mt-2 text-sm text-zinc-500">
+                Test skills before committing time to a preparation plan.
+              </p>
+
+
+              <input
+                value={simulationSkills}
+                onChange={(event) =>
+                  setSimulationSkills(
+                    event.target.value,
+                  )
+                }
+                placeholder="Add skills, e.g. SQL, Docker"
+                className="mt-4 w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none"
+              />
+
+
+              <div className="mt-3 flex gap-3">
+
+                <input
+                  type="number"
+                  min="0"
+                  max="5"
+                  value={simulationProjects}
+                  onChange={(event) =>
+                    setSimulationProjects(
+                      Number(
+                        event.target.value,
+                      ) || 0,
+                    )
+                  }
+                  className="w-28 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none"
+                />
+
+
+                <button
+                  onClick={() =>
+                    void runSimulation()
+                  }
+                  disabled={analysisLoading}
+                  className="neon-button flex-1 rounded-xl px-4 py-3 text-sm font-semibold"
+                >
+                  Simulate Improvement
+                </button>
+
+              </div>
+
+
+              {simulation && (
+
+                <div className="mt-5 grid grid-cols-2 gap-3">
+
+                  <div className="rounded-xl bg-white/[0.03] p-4">
+
+                    <div className="text-xs text-zinc-500">
+                      Readiness
+                    </div>
+
+                    <div className="mt-1 text-2xl text-cyan-300">
+                      {simulation.current_readiness}%
+                      {" → "}
+                      {simulation.simulated_readiness}%
+                    </div>
+
+                  </div>
+
+
+                  <div className="rounded-xl bg-white/[0.03] p-4">
+
+                    <div className="text-xs text-zinc-500">
+                      New opportunities
+                    </div>
+
+                    <div className="mt-1 text-2xl text-violet-200">
+                      +{simulation.unlocked_opportunities.length}
+                    </div>
+
+                  </div>
+
+                </div>
+
+              )}
+
             </div>
+
+
+            {/* STRATEGY */}
+
+            <div className="glass rounded-2xl p-5">
+
+              <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                Personal Application Strategy
+              </p>
+
+              <h2 className="mt-2 text-xl font-semibold">
+                Prepare to apply intelligently
+              </h2>
+
+
+              <button
+                onClick={() =>
+                  void openApplicationStrategy()
+                }
+                disabled={strategyLoading}
+                className="mt-4 w-full rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-200"
+              >
+                {strategyLoading
+                  ? "Generating..."
+                  : "Generate My Strategy"}
+              </button>
+
+
+              {strategy && (
+
+                <div className="mt-5 space-y-4">
+
+                  <div>
+
+                    <div className="text-xs text-zinc-500">
+                      Strongest selling points
+                    </div>
+
+
+                    <div className="mt-2 flex flex-wrap gap-2">
+
+                      {strategy.strongest_selling_points.map(
+                        (
+                          item,
+                          index,
+                        ) => (
+
+                          <span
+                            key={`${item}-${index}`}
+                            className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200"
+                          >
+                            {item}
+                          </span>
+
+                        ),
+                      )}
+
+                    </div>
+
+                  </div>
+
+
+                  <div>
+
+                    <div className="text-xs text-zinc-500">
+                      Improve before applying
+                    </div>
+
+
+                    <div className="mt-2 space-y-2">
+
+                      {strategy.improvements_before_applying.map(
+                        (
+                          item,
+                          index,
+                        ) => (
+
+                          <div
+                            key={`${item}-${index}`}
+                            className="text-sm text-zinc-300"
+                          >
+                            • {item}
+                          </div>
+
+                        ),
+                      )}
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+              )}
+
+            </div>
+
           </div>
+
         </section>
+
       )}
+
+
+      {/* PROFILE MODAL */}
 
       <ProfileModal
         open={profileOpen}
@@ -2280,18 +3177,40 @@ function App() {
           updatedProfile,
         ) => {
 
-          const saved =
-            await saveStudentProfile(
-              updatedProfile,
+          try {
+
+            const saved =
+              await saveStudentProfile(
+                updatedProfile,
+              );
+
+
+            setProfile(
+              saved,
             );
 
-          setProfile(saved);
 
-          setProfileOpen(false);
+            setProfileOpen(
+              false,
+            );
 
-          setStatus(
-            "Profile updated successfully.",
-          );
+
+            setStatus(
+              "Profile updated successfully.",
+            );
+
+          } catch (error) {
+
+            console.error(
+              error,
+            );
+
+            setStatus(
+              "Could not save the updated profile.",
+            );
+
+          }
+
         }}
       />
 
