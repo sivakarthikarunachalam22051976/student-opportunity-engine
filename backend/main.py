@@ -1,35 +1,91 @@
 from pathlib import Path
 import json
-from datetime import date
+import os
 import re
+from datetime import date, datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from .student import student_profile
-from .eligibility import check_eligibility
-from .matching import calculate_match
-from .gap_analysis import find_skill_gaps
-from .semantic_matching import get_semantic_skill_match
-from .resource_roadmap import create_resource_roadmap
-from .resume_parser import parse_resume_text
-from .skill_normalizer import normalize_skills
+# Support BOTH:
+#   1. uvicorn backend.main:app (package import)
+#   2. uvicorn main:app from inside backend/
+try:
+    from .student import student_profile
+    from .eligibility import check_eligibility
+    from .matching import calculate_match
+    from .gap_analysis import find_skill_gaps
+    from .semantic_matching import get_semantic_skill_match
+    from .resource_roadmap import create_resource_roadmap
+    from .resume_parser import parse_resume_text
+    from .skill_normalizer import normalize_skills
 
-from .live_opportunities import (
-    save_live_opportunities,
-    get_all_live_opportunities,
-)
+    from .live_opportunities import (
+        save_live_opportunities,
+        get_all_live_opportunities,
+    )
 
-from .ai.opportunity_parser import parse_opportunity_text
-from .ai.web_search import search_real_opportunities
+    from .ai.opportunity_parser import parse_opportunity_text
+    from .ai.web_search import search_real_opportunities
 
-from .intelligence_features import (
+    from .intelligence_features import (
     profile_intelligence,
     readiness_simulator,
     application_strategy,
-)
+    build_opportunity_workspace,
+    demo_snapshot,
+    detect_changes,
+    export_preparation_plan,
+    explain_ranking,
+    calculate_freshness,
+    build_source_evidence,
+    readiness_checklist,
+    deadline_intelligence,
+    best_next_action,
+    portfolio_impact,
+    weekly_mission,
+    quality_control,
+        remove_duplicate_opportunities,
+    )
+except ImportError:
+    from student import student_profile
+    from eligibility import check_eligibility
+    from matching import calculate_match
+    from gap_analysis import find_skill_gaps
+    from semantic_matching import get_semantic_skill_match
+    from resource_roadmap import create_resource_roadmap
+    from resume_parser import parse_resume_text
+    from skill_normalizer import normalize_skills
+
+    from live_opportunities import (
+        save_live_opportunities,
+        get_all_live_opportunities,
+    )
+
+    from ai.opportunity_parser import parse_opportunity_text
+    from ai.web_search import search_real_opportunities
+
+    from intelligence_features import (
+        profile_intelligence,
+        readiness_simulator,
+        application_strategy,
+        build_opportunity_workspace,
+        demo_snapshot,
+        detect_changes,
+        export_preparation_plan,
+        explain_ranking,
+        calculate_freshness,
+        build_source_evidence,
+        readiness_checklist,
+        deadline_intelligence,
+        best_next_action,
+        portfolio_impact,
+        weekly_mission,
+        quality_control,
+        remove_duplicate_opportunities,
+    )
 
 
 # ============================================================
@@ -53,9 +109,14 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://student-opportunity-engine-eta.vercel.app",
+        origin
+        for origin in [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "https://student-opportunity-engine-eta.vercel.app",
+            os.getenv("FRONTEND_URL"),
+        ]
+        if origin
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -116,12 +177,12 @@ def normalize_text_value(value):
 
 def normalize_skill_set(skills):
 
+    if not isinstance(skills, (list, tuple, set)):
+        return set()
+
     return {
-
         normalize_text_value(skill)
-
-        for skill in (skills or [])
-
+        for skill in skills
         if normalize_text_value(skill)
     }
 
@@ -244,6 +305,7 @@ def create_opportunity_identity(
 
     organization = normalize_text_value(
         opportunity.get("organization")
+        or opportunity.get("company")
     )
 
     application_url = normalize_text_value(
@@ -263,120 +325,59 @@ def create_opportunity_identity(
 
 
 def ensure_unique_opportunity_ids(
-    opportunities,
-):
+    opportunities: list[dict],
+) -> list[dict]:
+    """Return valid, identity-deduplicated opportunities with unique integer IDs."""
 
-    used_ids = set()
-    max_existing_id = 0
+    if not isinstance(opportunities, list):
+        return []
 
-    for item in opportunities:
-
-        try:
-
-            opportunity_id = int(
-                item.get("id")
-            )
-
-            if opportunity_id > 0:
-
-                used_ids.add(
-                    opportunity_id
-                )
-
-                max_existing_id = max(
-                    max_existing_id,
-                    opportunity_id,
-                )
-
-        except (
-            TypeError,
-            ValueError,
-        ):
-            pass
-
-
-    next_id = max_existing_id + 1
-
-    unique_opportunities = []
-    seen_identity = set()
-
+    used_ids: set[int] = set()
+    seen_identity: set[str] = set()
+    valid_ids: list[int] = []
 
     for original_item in opportunities:
+        if not isinstance(original_item, dict):
+            continue
+        try:
+            candidate = int(original_item.get("id"))
+        except (TypeError, ValueError):
+            continue
+        if candidate > 0:
+            valid_ids.append(candidate)
 
-        if not isinstance(
-            original_item,
-            dict,
-        ):
+    next_id = max(valid_ids, default=0) + 1
+    result: list[dict] = []
+
+    for original_item in opportunities:
+        if not isinstance(original_item, dict):
             continue
 
+        item = dict(original_item)
+        identity = create_opportunity_identity(item)
 
-        item = dict(
-            original_item
-        )
-
-        identity = (
-            create_opportunity_identity(
-                item
-            )
-        )
-
+        # Empty records are not useful and repeated records should not reach the API.
         if identity in seen_identity:
             continue
-
-
-        seen_identity.add(
-            identity
-        )
-
+        seen_identity.add(identity)
 
         try:
+            candidate = int(item.get("id"))
+        except (TypeError, ValueError):
+            candidate = 0
 
-            opportunity_id = int(
-                item.get("id")
-            )
-
-        except (
-            TypeError,
-            ValueError,
-        ):
-
-            opportunity_id = None
-
-
-        if (
-            opportunity_id is None
-            or opportunity_id <= 0
-            or opportunity_id in {
-
-                existing_id
-
-                for existing_id in used_ids
-
-                if existing_id != opportunity_id
-            }
-        ):
-
+        if candidate <= 0 or candidate in used_ids:
             while next_id in used_ids:
-
                 next_id += 1
-
-
-            opportunity_id = next_id
+            candidate = next_id
             next_id += 1
 
+        item["id"] = candidate
+        used_ids.add(candidate)
+        result.append(item)
 
-        item["id"] = opportunity_id
+    return result
 
-        used_ids.add(
-            opportunity_id
-        )
-
-        unique_opportunities.append(
-            item
-        )
-
-
-    return unique_opportunities
 
 
 def assign_live_opportunity_ids(
@@ -4498,3 +4499,226 @@ def get_application_strategy(
         opportunity,
     )
 
+# ============================================================
+# STEPS 36-55 — INTELLIGENCE ENDPOINTS
+# ============================================================
+
+@app.get("/api/intelligence/workspace/{opportunity_id}")
+def intelligence_workspace(
+    opportunity_id: int,
+):
+    opportunity = find_opportunity_by_id(
+        opportunity_id
+    )
+
+    if opportunity is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Opportunity not found",
+        )
+
+    return build_opportunity_workspace(
+        student_profile,
+        opportunity,
+    )
+
+
+@app.get("/api/intelligence/ranking/{opportunity_id}")
+def intelligence_ranking(
+    opportunity_id: int,
+):
+    opportunity = find_opportunity_by_id(
+        opportunity_id
+    )
+
+    if opportunity is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Opportunity not found",
+        )
+
+    return explain_ranking(
+        student_profile,
+        opportunity,
+    )
+
+
+@app.get("/api/intelligence/readiness/{opportunity_id}")
+def intelligence_readiness(
+    opportunity_id: int,
+):
+    opportunity = find_opportunity_by_id(
+        opportunity_id
+    )
+
+    if opportunity is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Opportunity not found",
+        )
+
+    return {
+        "opportunity": opportunity.get("title"),
+        "checklist": readiness_checklist(
+            student_profile,
+            opportunity,
+        ),
+    }
+
+
+@app.get("/api/intelligence/deadline/{opportunity_id}")
+def intelligence_deadline(
+    opportunity_id: int,
+):
+    opportunity = find_opportunity_by_id(
+        opportunity_id
+    )
+
+    if opportunity is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Opportunity not found",
+        )
+
+    return deadline_intelligence(
+        opportunity
+    )
+
+
+@app.get("/api/intelligence/action/{opportunity_id}")
+def intelligence_action(
+    opportunity_id: int,
+):
+    opportunity = find_opportunity_by_id(
+        opportunity_id
+    )
+
+    if opportunity is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Opportunity not found",
+        )
+
+    return best_next_action(
+        student_profile,
+        opportunity,
+    )
+
+
+@app.get("/api/intelligence/portfolio/{opportunity_id}")
+def intelligence_portfolio(
+    opportunity_id: int,
+):
+    opportunity = find_opportunity_by_id(
+        opportunity_id
+    )
+
+    if opportunity is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Opportunity not found",
+        )
+
+    return portfolio_impact(
+        student_profile,
+        opportunity,
+    )
+
+
+@app.get("/api/intelligence/freshness/{opportunity_id}")
+def intelligence_freshness(
+    opportunity_id: int,
+):
+    opportunity = find_opportunity_by_id(
+        opportunity_id
+    )
+
+    if opportunity is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Opportunity not found",
+        )
+
+    return calculate_freshness(
+        opportunity
+    )
+
+
+@app.get("/api/intelligence/source/{opportunity_id}")
+def intelligence_source(
+    opportunity_id: int,
+):
+    opportunity = find_opportunity_by_id(
+        opportunity_id
+    )
+
+    if opportunity is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Opportunity not found",
+        )
+
+    return build_source_evidence(
+        opportunity
+    )
+
+
+@app.get("/api/intelligence/weekly-mission")
+def intelligence_weekly_mission():
+    opportunities = get_all_opportunities()
+
+    return weekly_mission(
+        student_profile,
+        opportunities,
+    )
+
+
+@app.get("/api/intelligence/quality")
+def intelligence_quality():
+    opportunities = get_all_opportunities()
+
+    return quality_control(
+        opportunities
+    )
+
+
+@app.get("/api/intelligence/deduplicated")
+def intelligence_deduplicated():
+    opportunities = get_all_opportunities()
+
+    return remove_duplicate_opportunities(
+        opportunities
+    )
+
+
+@app.get(
+    "/api/intelligence/export/{opportunity_id}"
+)
+def intelligence_export(
+    opportunity_id: int,
+):
+    opportunity = find_opportunity_by_id(
+        opportunity_id
+    )
+
+    if opportunity is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Opportunity not found",
+        )
+
+    return {
+        "filename": "preparation-plan.txt",
+        "content": export_preparation_plan(
+            student_profile,
+            opportunity,
+        ),
+    }
+
+
+@app.get("/api/demo")
+def intelligence_demo():
+    return demo_snapshot(
+        student_profile,
+        get_all_opportunities(),
+    )

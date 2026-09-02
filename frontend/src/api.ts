@@ -297,3 +297,119 @@ export async function parseResume(text: string) {
     },
   );
 }
+
+
+// ============================================================
+// STEPS 36–55 — INTELLIGENCE
+// ============================================================
+
+export async function getWorkspace(
+  id: number,
+) {
+  return request<any>(
+    `/api/intelligence/workspace/${id}`,
+  );
+}
+
+
+export async function getRanking(
+  id: number,
+) {
+  return request<any>(
+    `/api/intelligence/ranking/${id}`,
+  );
+}
+
+
+export async function getReadinessChecklist(
+  id: number,
+) {
+  return request<any>(
+    `/api/intelligence/readiness/${id}`,
+  );
+}
+
+
+export async function getDeadlineIntelligence(
+  id: number,
+) {
+  return request<any>(
+    `/api/intelligence/deadline/${id}`,
+  );
+}
+
+
+export async function getBestNextAction(
+  id: number,
+) {
+  return request<any>(
+    `/api/intelligence/action/${id}`,
+  );
+}
+
+
+export async function getPortfolioImpact(
+  id: number,
+) {
+  return request<any>(
+    `/api/intelligence/portfolio/${id}`,
+  );
+}
+
+
+export async function getFreshness(
+  id: number,
+) {
+  return request<any>(
+    `/api/intelligence/freshness/${id}`,
+  );
+}
+
+
+export async function getSourceEvidence(
+  id: number,
+) {
+  return request<any>(
+    `/api/intelligence/source/${id}`,
+  );
+}
+
+
+export async function getWeeklyMission() {
+  return request<any>(
+    "/api/intelligence/weekly-mission",
+  );
+}
+
+
+export async function getQualityReport() {
+  return request<any>(
+    "/api/intelligence/quality",
+  );
+}
+
+
+export async function getDeduplicatedOpportunities() {
+  return request<Opportunity[]>(
+    "/api/intelligence/deduplicated",
+  );
+}
+
+
+export async function exportPreparationPlan(
+  id: number,
+) {
+  return request<{
+    filename: string;
+    content: string;
+  }>(
+    `/api/intelligence/export/${id}`,
+  );
+}
+
+
+export async function getDemoSnapshot() {
+  return request<any>(
+    "/api/demo",
+  );
+}
