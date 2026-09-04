@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Sparkles,
   TrendingUp,
+  Target,
 } from "lucide-react";
 
 import {
