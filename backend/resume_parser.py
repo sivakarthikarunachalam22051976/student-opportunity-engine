@@ -1,3 +1,4 @@
+
 import io
 import os
 import re
@@ -6,7 +7,10 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-from .skill_normalizer import normalize_skills
+try:
+    from .skill_normalizer import normalize_skills
+except ImportError:
+    from .skill_normaliser import normalize_skills
 
 
 # ============================================================

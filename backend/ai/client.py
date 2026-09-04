@@ -4,7 +4,10 @@ import re
 from pathlib import Path
 
 from dotenv import load_dotenv
-from groq import Groq
+try:
+    from groq import Groq
+except ImportError:  # Keep the rule-based backend usable without the optional AI package.
+    Groq = None
 
 
 # ============================================================
@@ -42,10 +45,8 @@ GROQ_MODEL = (
 client = None
 
 
-if GROQ_API_KEY:
-    client = Groq(
-        api_key=GROQ_API_KEY
-    )
+if GROQ_API_KEY and Groq is not None:
+    client = Groq(api_key=GROQ_API_KEY)
 
 
 # ============================================================

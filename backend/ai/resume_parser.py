@@ -1,10 +1,23 @@
+
 import os
 import re
 
-from .skill_normalizer import (
-    SKILL_ALIASES,
-    normalize_skills,
-)
+try:
+    from ..skill_normalizer import (
+        SKILL_ALIASES,
+        normalize_skills,
+    )
+except ImportError:
+    try:
+        from .skill_normalizer import (
+            SKILL_ALIASES,
+            normalize_skills,
+        )
+    except ImportError:
+        try:
+            from ..skill_normaliser import normalize_skills, SKILL_ALIASES
+        except ImportError:
+            from skill_normaliser import normalize_skills, SKILL_ALIASES
 
 
 def extract_resume_text(

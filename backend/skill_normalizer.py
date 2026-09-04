@@ -1,3 +1,4 @@
+
 import re
 
 
@@ -133,7 +134,7 @@ def normalize_skills(skills):
         return []
 
     if isinstance(skills, str):
-        skills = skills.split(",")
+        skills = re.split(r"[,;\n\r|]+", skills)
 
     normalized = []
 

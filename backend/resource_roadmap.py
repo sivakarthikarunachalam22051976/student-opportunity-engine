@@ -146,6 +146,8 @@ def create_resource_roadmap(
             []
         )
 
+        topics = get_topics_for_skill(normalized_skill)
+
         roadmap.append({
             "skill": normalized_skill,
 
@@ -160,11 +162,21 @@ def create_resource_roadmap(
                 "relevant to this opportunity."
             ),
 
-            "topics": get_topics_for_skill(
-                normalized_skill
+            # Keep both the richer resource data and the field names
+            # consumed by the Preparation and Future Path screens.
+            "topics": topics,
+            "steps": topics,
+            "learn": topics,
+            "practice": [
+                f"Complete a small hands-on {normalized_skill} exercise.",
+                f"Apply {normalized_skill} in a practical task.",
+            ],
+            "project": (
+                f"Build one small portfolio project that demonstrates {normalized_skill} "
+                "and document what you learned."
             ),
-
-            "resources": resources
+            "estimated_hours": max(4, min(20, len(topics) * 2)),
+            "resources": resources,
         })
 
     priority_order = {

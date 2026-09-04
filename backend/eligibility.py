@@ -1,4 +1,5 @@
 from datetime import date
+import re
 
 
 def normalize_text(value):
@@ -6,6 +7,29 @@ def normalize_text(value):
         return ""
 
     return str(value).strip().lower()
+
+
+def normalize_branch(value):
+    """Normalize common branch abbreviations and punctuation."""
+    text = normalize_text(value)
+    compact = re.sub(r"[^a-z0-9]", "", text)
+    aliases = {
+        "cse": "computerscienceengineering",
+        "cs": "computerscience",
+        "computerscience": "computerscience",
+        "computerscienceengineering": "computerscienceengineering",
+        "ise": "informationtechnology",
+        "it": "informationtechnology",
+        "informationtechnology": "informationtechnology",
+        "ai": "artificialintelligence",
+        "aiml": "artificialintelligencemachinelearning",
+        "artificialintelligence": "artificialintelligence",
+        "ece": "electronicscommunicationengineering",
+        "eee": "electricalelectronicsengineering",
+        "me": "mechanicalengineering",
+        "civil": "civilengineering",
+    }
+    return aliases.get(compact, compact)
 
 
 def normalize_year(year):
@@ -83,7 +107,7 @@ def check_eligibility(student, opportunity):
     # BRANCH
     # ========================================================
 
-    student_branch = normalize_text(
+    student_branch = normalize_branch(
         student.get("branch")
     )
 
@@ -95,7 +119,7 @@ def check_eligibility(student, opportunity):
     if opportunity_branches:
 
         normalized_branches = {
-            normalize_text(branch)
+            normalize_branch(branch)
             for branch in opportunity_branches
         }
 

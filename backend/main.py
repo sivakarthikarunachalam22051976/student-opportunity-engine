@@ -1,72 +1,69 @@
+
 from pathlib import Path
 import json
 import os
 import re
 from datetime import date, datetime, timezone
 from typing import Any
+import shutil
+import tempfile
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-# Support BOTH:
-#   1. uvicorn backend.main:app (package import)
-#   2. uvicorn main:app from inside backend/
-try:
+# Support both package and script execution without masking real dependency errors.
+#   1. uvicorn backend.main:app (from the project root)
+#   2. uvicorn main:app (from inside backend/)
+if __package__:
     from .student import student_profile
     from .eligibility import check_eligibility
     from .matching import calculate_match
     from .gap_analysis import find_skill_gaps
     from .semantic_matching import get_semantic_skill_match
     from .resource_roadmap import create_resource_roadmap
-    from .resume_parser import parse_resume_text
+    from .resume_parser import parse_resume_text, extract_resume_text
     from .skill_normalizer import normalize_skills
-
     from .live_opportunities import (
         save_live_opportunities,
         get_all_live_opportunities,
     )
-
     from .ai.opportunity_parser import parse_opportunity_text
     from .ai.web_search import search_real_opportunities
-
     from .intelligence_features import (
-    profile_intelligence,
-    readiness_simulator,
-    application_strategy,
-    build_opportunity_workspace,
-    demo_snapshot,
-    detect_changes,
-    export_preparation_plan,
-    explain_ranking,
-    calculate_freshness,
-    build_source_evidence,
-    readiness_checklist,
-    deadline_intelligence,
-    best_next_action,
-    portfolio_impact,
-    weekly_mission,
-    quality_control,
+        profile_intelligence,
+        readiness_simulator,
+        application_strategy,
+        build_opportunity_workspace,
+        demo_snapshot,
+        detect_changes,
+        export_preparation_plan,
+        explain_ranking,
+        calculate_freshness,
+        build_source_evidence,
+        readiness_checklist,
+        deadline_intelligence,
+        best_next_action,
+        portfolio_impact,
+        weekly_mission,
+        quality_control,
         remove_duplicate_opportunities,
     )
-except ImportError:
+else:
     from student import student_profile
     from eligibility import check_eligibility
     from matching import calculate_match
     from gap_analysis import find_skill_gaps
     from semantic_matching import get_semantic_skill_match
     from resource_roadmap import create_resource_roadmap
-    from resume_parser import parse_resume_text
+    from resume_parser import parse_resume_text, extract_resume_text
     from skill_normalizer import normalize_skills
-
     from live_opportunities import (
         save_live_opportunities,
         get_all_live_opportunities,
     )
-
     from ai.opportunity_parser import parse_opportunity_text
     from ai.web_search import search_real_opportunities
-
     from intelligence_features import (
         profile_intelligence,
         readiness_simulator,
@@ -86,7 +83,6 @@ except ImportError:
         quality_control,
         remove_duplicate_opportunities,
     )
-
 
 # ============================================================
 # APP
@@ -1778,14 +1774,43 @@ def get_student():
     return student_profile
 
 
+def split_profile_items(values) -> list[str]:
+    """
+    Accept list fields that may contain commas, semicolons, newlines,
+    pipes or bullet-prefixed entries. This makes profile editing tolerant
+    of messy individual-field input without treating the whole profile as
+    one paragraph.
+    """
+    if values is None:
+        return []
+
+    if isinstance(values, str):
+        values = [values]
+
+    result: list[str] = []
+
+    for value in values:
+        if value is None:
+            continue
+
+        text = str(value)
+        text = text.replace("•", ",").replace("·", ",")
+        parts = re.split(r"[,;\n\r|]+", text)
+
+        for part in parts:
+            cleaned = re.sub(r"^[-*]+\\s*", "", part).strip()
+            if cleaned and cleaned not in result:
+                result.append(cleaned)
+
+    return result
+
+
 def update_student_profile_data(
     request: StudentProfileRequest,
 ):
 
-    normalized_student_skills = (
-        normalize_skills(
-            request.skills
-        )
+    normalized_student_skills = normalize_skills(
+        split_profile_items(request.skills)
     )
 
 
@@ -1807,37 +1832,16 @@ def update_student_profile_data(
         request.location.strip(),
 
         "interests":
-        [
-
-            interest.strip()
-
-            for interest in request.interests
-
-            if interest.strip()
-        ],
+        split_profile_items(request.interests),
 
         "skills":
         normalized_student_skills,
 
         "projects":
-        [
-
-            project.strip()
-
-            for project in request.projects
-
-            if project.strip()
-        ],
+        split_profile_items(request.projects),
 
         "evidence":
-        [
-
-            item.strip()
-
-            for item in request.evidence
-
-            if item.strip()
-        ],
+        split_profile_items(request.evidence),
 
         "opportunity_type":
         normalize_opportunity_type(
@@ -2044,12 +2048,24 @@ def check_opportunity_eligibility(
     )
 
 
+    deadline_intelligence = calculate_deadline_intelligence(
+        opportunity.get("deadline")
+    )
+
     return {
 
         "opportunity":
         opportunity.get(
             "title"
         ),
+
+        "opportunity_details": {
+            "organization": opportunity.get("organization") or opportunity.get("company"),
+            "location": opportunity.get("location"),
+            "remote": opportunity.get("remote"),
+            "deadline": opportunity.get("deadline"),
+            "type": opportunity.get("type"),
+        },
 
         **result,
     }
@@ -2374,10 +2390,140 @@ def get_resource_roadmap(
 def parse_resume(
     request: ResumeTextRequest,
 ):
-
     return parse_resume_text(
         request.text
     )
+
+
+@app.post("/api/resume/upload")
+async def upload_resume(
+    file: UploadFile = File(...),
+):
+    """
+    Accept a real resume file from the browser, extract readable text,
+    and return the same structured result as /api/resume/parse.
+    """
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Please select a resume file.",
+        )
+
+    suffix = Path(file.filename).suffix.lower()
+
+    allowed_extensions = {
+        ".pdf",
+        ".docx",
+        ".doc",
+        ".txt",
+        ".md",
+        ".rtf",
+        ".html",
+        ".htm",
+        ".json",
+    }
+
+    if suffix not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Unsupported resume format. Use PDF, DOCX, DOC, TXT, "
+                "RTF, HTML or JSON."
+            ),
+        )
+
+    temporary_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            suffix=suffix,
+            delete=False,
+        ) as temporary_file:
+            temporary_path = temporary_file.name
+            shutil.copyfileobj(
+                file.file,
+                temporary_file,
+            )
+
+        text = extract_resume_text(temporary_path)
+        parsed = parse_resume_text(text)
+        parsed["filename"] = file.filename
+
+        return parsed
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Resume analysis failed: {error}",
+        )
+
+    finally:
+        try:
+            await file.close()
+        except Exception:
+            pass
+
+        if temporary_path:
+            try:
+                os.remove(temporary_path)
+            except OSError:
+                pass
+
+
+# ============================================================
+# RESUME-TO-OPPORTUNITY MATCH
+# ============================================================
+
+@app.post("/api/resume/match/{opportunity_id}")
+def resume_match_opportunity(
+    opportunity_id: int,
+    payload: dict[str, Any],
+):
+    opportunity = find_opportunity_by_id(opportunity_id)
+
+    if opportunity is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Opportunity not found",
+        )
+
+    resume_text = str(payload.get("text", "") or "").strip()
+    if not resume_text:
+        raise HTTPException(
+            status_code=400,
+            detail="Resume text is required.",
+        )
+
+    parsed = parse_resume_text(resume_text)
+    resume_skills = parsed.get("skills", [])
+
+    resume_student = {
+        **student_profile,
+        "skills": resume_skills,
+        "projects": parsed.get("projects", []),
+        "evidence": parsed.get("experience_signals", []),
+    }
+
+    match = calculate_match(resume_student, opportunity)
+    eligibility = check_eligibility(resume_student, opportunity)
+
+    return {
+        "opportunity": opportunity.get("title"),
+        "eligible": eligibility.get("eligible", True),
+        "match_score": match.get("match_score", 0),
+        "matched_skills": match.get("matched_skills", []),
+        "missing_skills": match.get("missing_skills", []),
+        "breakdown": match.get("breakdown", []),
+        "resume_skills": resume_skills,
+        "projects": parsed.get("projects", []),
+        "experience_signals": parsed.get("experience_signals", []),
+        "message": (
+            "Resume evidence matched against the opportunity requirements."
+        ),
+    }
 
 
 # ============================================================
@@ -3216,6 +3362,13 @@ def build_preparation_plan(
         "current_readiness":
         readiness,
 
+        # Compatibility aliases used by older/newer frontend builds.
+        "readiness_percentage":
+        readiness,
+
+        "current_skills":
+        matched_skills,
+
         "readiness_level":
         readiness_result.get(
             "readiness_level",
@@ -3250,6 +3403,9 @@ def build_preparation_plan(
 
         "application_strategy":
         application_strategy_result,
+
+        "deadline":
+        deadline_intelligence,
 
         "priority_actions":
         [
@@ -3359,11 +3515,9 @@ def future_opportunity_path(
     )
 
 
-    current_readiness = (
-        preparation.get(
-            "current_readiness",
-            0,
-        )
+    current_readiness = preparation.get(
+        "readiness_percentage",
+        preparation.get("current_readiness", 0),
     )
 
 
@@ -3417,8 +3571,8 @@ def future_opportunity_path(
             "milestones":
 
             item.get(
-                "learn",
-                [],
+                "steps",
+                item.get("learn", []),
             )[:4],
 
             "practice":
@@ -3434,6 +3588,14 @@ def future_opportunity_path(
                 "project",
                 "Build a portfolio-quality project.",
             ),
+
+            "projects":
+            [
+                item.get(
+                    "project",
+                    "Build a portfolio-quality project.",
+                )
+            ],
 
             "success_criteria":
 
@@ -3608,6 +3770,12 @@ def future_opportunity_path(
 
         "current_readiness":
         current_readiness,
+
+        "readiness_percentage":
+        current_readiness,
+
+        "current_skills":
+        preparation.get("current_skills", preparation.get("matched_skills", [])),
 
         "readiness_level":
         preparation.get(
