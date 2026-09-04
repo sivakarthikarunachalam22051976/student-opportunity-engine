@@ -1,3 +1,4 @@
+
 import type {
   FuturePathResponse,
   HiddenRecommendation,
@@ -10,6 +11,7 @@ import type {
   ProfileIntelligence,
   ReadinessSimulationResponse,
   ApplicationStrategyResponse,
+  ComparisonResponse,
   WeeklyMission,
   QualityReport,
 } from "./types";
@@ -57,11 +59,6 @@ type HealthResponse = {
 type SaveStudentResponse = {
   message?: string;
   student: StudentProfile;
-};
-
-type ComparisonResponse = {
-  comparison: any[];
-  summary?: any;
 };
 
 type ExportPreparationPlanResponse = {
@@ -435,17 +432,49 @@ export async function compareOpportunities(
 // ------------------------------------------------------------
 
 export async function parseResume(
-  text: string,
-): Promise<any> {
-  return request<any>(
-    "/api/resume/parse",
+  file: File,
+): Promise<{
+  skills: string[];
+  education: string[];
+  experience_signals: string[];
+  projects: string[];
+  email: string | null;
+  phone: string | null;
+  raw_text: string;
+  text_length: number;
+  skills_detected: number;
+  parsing_status: string;
+}> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(
+    `${API}/api/resume/upload`,
     {
       method: "POST",
-      body: JSON.stringify({
-        text,
-      }),
+      body: formData,
+      headers: {
+        Accept: "application/json",
+      },
     },
   );
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response));
+  }
+
+  return (await response.json()) as {
+    skills: string[];
+    education: string[];
+    experience_signals: string[];
+    projects: string[];
+    email: string | null;
+    phone: string | null;
+    raw_text: string;
+    text_length: number;
+    skills_detected: number;
+    parsing_status: string;
+  };
 }
 
 

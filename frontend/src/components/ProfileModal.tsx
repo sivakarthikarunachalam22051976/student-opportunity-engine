@@ -1,3 +1,4 @@
+
 import {
   useEffect,
   useState,
@@ -82,20 +83,16 @@ export default function ProfileModal({
       | "evidence",
     value: string,
   ) {
+    const items = value
+      .replace(/[•·]/g, ",")
+      .split(/[,;\n\r|]+/)
+      .map((item) => item.replace(/^[-*]+\s*/, "").trim())
+      .filter(Boolean);
 
-    setFormData(
-      current => ({
-        ...current,
-        [field]:
-          value
-            .split(",")
-            .map(
-              item =>
-                item.trim()
-            )
-            .filter(Boolean),
-      })
-    );
+    setFormData((current) => ({
+      ...current,
+      [field]: Array.from(new Set(items)),
+    }));
   }
 
 
@@ -119,11 +116,8 @@ export default function ProfileModal({
 
       <div
         className="
-          glass w-full max-w-3xl
-          max-h-[92vh]
-          overflow-hidden
-          rounded-3xl
-          shadow-2xl
+          glass flex w-full max-w-3xl max-h-[92vh] flex-col
+          overflow-hidden rounded-3xl shadow-2xl
         "
       >
 
@@ -199,8 +193,7 @@ export default function ProfileModal({
 
         <div
           className="
-            max-h-[calc(92vh-145px)]
-            overflow-y-auto
+            min-h-0 flex-1 overflow-y-auto overscroll-contain
             px-6 py-6
           "
         >

@@ -1,3 +1,5 @@
+
+
 import {
   useEffect,
   useMemo,
@@ -24,6 +26,7 @@ import {
 import {
   compareOpportunities,
   getFuturePath,
+  getOpportunities,
   getHealth,
   getProfileIntelligence,
   getWorkspace,
@@ -64,6 +67,7 @@ import type {
 
 type AppView =
   | "dashboard"
+  | "workspace"
   | "preparation"
   | "future"
   | "comparison";
@@ -390,7 +394,7 @@ function App() {
 
 
   const [
-    workspaceOpen,
+    ,
     setWorkspaceOpen,
   ] = useState(false);
 
@@ -575,6 +579,10 @@ function App() {
 
     setWorkspaceOpen(true);
 
+    setView(
+      "workspace",
+    );
+
     setWorkspaceLoading(true);
 
     setWorkspace(null);
@@ -639,23 +647,39 @@ function App() {
       );
 
 
-      const result =
-        await searchOpportunities(
-          saved,
-        );
+      let discovered: Opportunity[] = [];
 
-
-      const discovered =
-        Array.isArray(
-          result?.opportunities,
-        )
+      try {
+        const result = await searchOpportunities(saved);
+        discovered = Array.isArray(result?.opportunities)
           ? result.opportunities
           : [];
+      } catch (liveSearchError) {
+        console.error(
+          "Live search failed; using stored opportunities:",
+          liveSearchError,
+        );
+      }
 
+      // Keep the dashboard useful even when live search/AI is unavailable.
+      if (discovered.length === 0) {
+        try {
+          const fallback = await getOpportunities();
+          discovered = Array.isArray(fallback) ? fallback : [];
+          setStatus(
+            discovered.length > 0
+              ? `${discovered.length} stored opportunities loaded. Live search was unavailable.`
+              : "No opportunities are currently available. Check the backend and search configuration.",
+          );
+        } catch (fallbackError) {
+          console.error(
+            "Stored opportunity fallback failed:",
+            fallbackError,
+          );
+        }
+      }
 
-      setOpportunities(
-        discovered,
-      );
+      setOpportunities(discovered);
 
 
       setSelected(
@@ -1117,51 +1141,58 @@ function App() {
   async function handleResumeUpload(
     file: File,
   ) {
-
     try {
+      setResumeLoading(true);
 
-      setResumeLoading(
-        true,
-      );
+      const parsed = await parseResume(file);
 
+      setResumeResult(parsed);
 
-      const text =
-        await file.text();
+      const parsedSkills = Array.isArray(parsed?.skills)
+        ? parsed.skills.filter(
+            (item: unknown): item is string =>
+              typeof item === "string" && item.trim().length > 0,
+          )
+        : [];
 
+      const parsedProjects = Array.isArray(parsed?.projects)
+        ? parsed.projects.filter(
+            (item: unknown): item is string =>
+              typeof item === "string" && item.trim().length > 0,
+          )
+        : [];
 
-      const parsed =
-        await parseResume(
-          text,
-        );
-
-
-      setResumeResult(
-        parsed,
-      );
-
+      setProfile((current) => ({
+        ...current,
+        skills: Array.from(
+          new Set([...current.skills, ...parsedSkills]),
+        ),
+        projects: Array.from(
+          new Set([...(current.projects || []), ...parsedProjects]),
+        ),
+        evidence: Array.from(
+          new Set([
+            ...(current.evidence || []),
+            ...parsedProjects,
+          ]),
+        ),
+      }));
 
       setStatus(
-        "Resume analysed. Extracted profile evidence is ready to review.",
+        parsedSkills.length > 0 || parsedProjects.length > 0
+          ? "Resume analysed. Detected skills and projects have been added to your profile. Open Edit Profile to review and save them."
+          : "Resume analysed, but no new skills or projects were confidently detected. Review the extracted evidence below.",
       );
-
     } catch (error) {
-
-      console.error(
-        error,
-      );
-
+      console.error("Resume upload failed:", error);
       setStatus(
-        "Resume analysis failed. Check the backend resume parser.",
+        error instanceof Error
+          ? error.message
+          : "Resume analysis failed. Check the backend resume parser.",
       );
-
     } finally {
-
-      setResumeLoading(
-        false,
-      );
-
+      setResumeLoading(false);
     }
-
   }
 
 
@@ -1327,11 +1358,11 @@ function App() {
 
 
   // ==========================================================
-  // PREPARATION VIEW
+  // OPPORTUNITY WORKSPACE VIEW
   // ==========================================================
 
   if (
-    view === "preparation"
+    view === "workspace"
   ) {
 
     return (
@@ -1339,228 +1370,307 @@ function App() {
 
         <header className="border-b border-white/8 bg-[#0a0a0c]/90">
 
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 lg:px-8">
 
-            <BackButton />
+            <button
+              onClick={() => {
+                setWorkspaceOpen(false);
+                setWorkspace(null);
+                setView("dashboard");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-zinc-300 transition hover:border-cyan-300/30 hover:bg-white/[0.06] hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </button>
 
-            <span className="text-xs text-zinc-500">
-              Preparation Intelligence
-            </span>
+            <div className="text-right">
+              <div className="text-xs font-medium text-zinc-400">Opportunity Intelligence</div>
+              <div className="mt-1 text-[11px] text-zinc-600">A focused view for one opportunity</div>
+            </div>
 
           </div>
 
         </header>
 
-
-        <section className="mx-auto max-w-6xl px-5 py-10">
-
-          <div className="glass rounded-3xl p-6 sm:p-8">
-
-            <div className="flex flex-col justify-between gap-6 lg:flex-row">
-
-              <div>
-
-                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-xs text-cyan-200">
-
-                  <Brain className="h-4 w-4" />
-
-                  Personalised gap-closing plan
-
-                </div>
-
-
-                <h1 className="mt-5 text-3xl font-semibold">
-                  Preparation Roadmap
-                </h1>
-
-
-                <p className="mt-3 text-sm text-zinc-400">
-                  {selected?.title ||
-                    preparation?.opportunity}
-                </p>
-
-              </div>
-
-
-              <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.06] px-6 py-5 text-center">
-
-                <div className="text-4xl font-semibold text-cyan-300">
-                  {preparation?.readiness_percentage ?? 0}%
-                </div>
-
-                <div className="mt-1 text-xs text-zinc-500">
-                  CURRENT READINESS
-                </div>
-
-              </div>
-
-            </div>
-
-
-            <div className="mt-8 grid gap-4 md:grid-cols-2">
-
-              <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.04] p-5">
-
-                <div className="flex items-center gap-2 text-sm text-emerald-200">
-
-                  <CheckCircle2 className="h-4 w-4" />
-
-                  Skills you already have
-
-                </div>
-
-
-                <div className="mt-4 flex flex-wrap gap-2">
-
-                  {(preparation?.current_skills || [])
-                    .map(
-                      (skill, index) => (
-                        <span
-                          key={`${skill}-${index}`}
-                          className="rounded-lg bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-200"
-                        >
-                          {skill}
-                        </span>
-                      ),
-                    )}
-
-                </div>
-
-              </div>
-
-
-              <div className="rounded-2xl border border-amber-400/15 bg-amber-400/[0.04] p-5">
-
-                <div className="flex items-center gap-2 text-sm text-amber-200">
-
-                  <AlertTriangle className="h-4 w-4" />
-
-                  Priority skill gaps
-
-                </div>
-
-
-                <div className="mt-4 flex flex-wrap gap-2">
-
-                  {(preparation?.missing_skills || [])
-                    .map(
-                      (skill, index) => (
-                        <span
-                          key={`${skill}-${index}`}
-                          className="rounded-lg bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200"
-                        >
-                          {skill}
-                        </span>
-                      ),
-                    )}
-
-                </div>
-
-              </div>
-
-            </div>
-
-
-            <div className="mt-10">
-
-              <h2 className="text-2xl font-semibold">
-                Close the gap step by step
-              </h2>
-
-
-              <div className="mt-6 space-y-5">
-
-                {(preparation?.roadmap || [])
-                  .map(
-                    (item, index) => (
-
-                      <div
-                        key={`${item.skill}-${index}`}
-                        className="rounded-2xl border border-white/8 bg-white/[0.025] p-5"
-                      >
-
-                        <div className="flex justify-between gap-4">
-
-                          <div>
-
-                            <div className="text-xs text-zinc-500">
-                              STEP {index + 1}
-                            </div>
-
-                            <h3 className="mt-1 text-xl font-semibold text-cyan-100">
-                              {item.skill}
-                            </h3>
-
-                          </div>
-
-
-                          {item.priority && (
-                            <span className="h-fit rounded-full bg-violet-500/10 px-3 py-1 text-xs text-violet-200">
-                              {item.priority} priority
-                            </span>
-                          )}
-
-                        </div>
-
-
-                        {(item.steps || []).length > 0 && (
-
-                          <div className="mt-5 grid gap-2 sm:grid-cols-2">
-
-                            {(item.steps || [])
-                              .map(
-                                (
-                                  step,
-                                  stepIndex,
-                                ) => (
-
-                                  <div
-                                    key={`${step}-${stepIndex}`}
-                                    className="rounded-xl bg-black/20 p-3 text-sm text-zinc-300"
-                                  >
-                                    {stepIndex + 1}. {step}
-                                  </div>
-
-                                ),
-                              )}
-
-                          </div>
-
-                        )}
-
-
-                        {item.project && (
-
-                          <div className="mt-5 rounded-xl border border-cyan-300/10 bg-cyan-300/[0.04] p-4">
-
-                            <div className="text-xs uppercase tracking-wider text-cyan-200">
-                              Portfolio mission
-                            </div>
-
-                            <p className="mt-2 text-sm text-zinc-400">
-                              {item.project}
-                            </p>
-
-                          </div>
-
-                        )}
-
-                      </div>
-
-                    ),
-                  )}
-
-              </div>
-
-            </div>
-
-          </div>
+        <section className="mx-auto max-w-7xl px-5 py-8 lg:px-8 lg:py-10">
+
+          <OpportunityWorkspace
+            data={workspace}
+            loading={workspaceLoading}
+            onClose={() => {
+              setWorkspaceOpen(false);
+              setWorkspace(null);
+              setView("dashboard");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          />
 
         </section>
 
       </main>
     );
+  }
 
+
+  // ==========================================================
+  // PREPARATION VIEW
+  // ==========================================================
+
+  if (
+    view === "preparation"
+  ) {
+
+    const readiness =
+      Number(
+        preparation?.readiness_percentage ??
+        preparation?.current_readiness ??
+        0,
+      );
+
+    const currentSkills =
+      preparation?.current_skills ||
+      preparation?.matched_skills ||
+      [];
+
+    const requiredSkills =
+      preparation?.required_skills ||
+      [];
+
+    const missingSkills =
+      preparation?.missing_skills ||
+      [];
+
+    const roadmap =
+      preparation?.roadmap ||
+      [];
+
+    const totalHours =
+      Number(
+        preparation?.estimated_total_hours ||
+        0,
+      );
+
+    const totalWeeks =
+      Number(
+        preparation?.estimated_weeks ||
+        0,
+      );
+
+    const deadlineInfo =
+      (preparation as any)?.deadline ||
+      null;
+
+    const applicationStrategy =
+      (preparation as any)?.application_strategy ||
+      null;
+
+    return (
+      <main className="min-h-screen bg-[#0a0a0c] text-white">
+
+        <header className="border-b border-white/8 bg-[#0a0a0c]/90">
+          <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+            <BackButton />
+            <span className="text-xs text-zinc-500">Preparation Intelligence</span>
+          </div>
+        </header>
+
+        <section className="mx-auto max-w-6xl px-5 py-8 lg:py-10">
+
+          <div className="glass rounded-3xl p-6 sm:p-8">
+
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-3xl">
+                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-xs text-cyan-200">
+                  <Brain className="h-4 w-4" />
+                  Personalised gap-closing plan
+                </div>
+
+                <h1 className="mt-5 text-3xl font-semibold sm:text-4xl">Preparation Roadmap</h1>
+
+                <p className="mt-3 text-base leading-7 text-zinc-400">
+                  {selected?.title || preparation?.opportunity || "Selected opportunity"}
+                </p>
+
+                <p className="mt-2 text-sm leading-6 text-zinc-500">
+                  This plan shows where you stand now, what the opportunity expects, what is missing, how long the gaps may take to close, and the portfolio proof you should build before applying.
+                </p>
+              </div>
+
+              <div className="shrink-0 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.06] px-7 py-5 text-center">
+                <div className="text-5xl font-semibold text-cyan-300">{readiness}%</div>
+                <div className="mt-1 text-xs uppercase tracking-[0.16em] text-zinc-500">Current readiness</div>
+                <div className="mt-2 text-xs text-zinc-500">{preparation?.readiness_level || "Developing"}</div>
+              </div>
+            </div>
+
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-5">
+                <div className="text-xs uppercase tracking-wider text-zinc-500">Skills matched</div>
+                <div className="mt-2 text-2xl font-semibold text-emerald-200">{currentSkills.length}</div>
+                <div className="mt-1 text-xs text-zinc-600">Relevant skills already present</div>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-5">
+                <div className="text-xs uppercase tracking-wider text-zinc-500">Priority gaps</div>
+                <div className="mt-2 text-2xl font-semibold text-amber-200">{missingSkills.length}</div>
+                <div className="mt-1 text-xs text-zinc-600">Skills to strengthen</div>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-5">
+                <div className="text-xs uppercase tracking-wider text-zinc-500">Estimated effort</div>
+                <div className="mt-2 text-2xl font-semibold text-cyan-200">{totalHours || "—"}{totalHours ? "h" : ""}</div>
+                <div className="mt-1 text-xs text-zinc-600">Approximate hands-on preparation</div>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-5">
+                <div className="text-xs uppercase tracking-wider text-zinc-500">Plan length</div>
+                <div className="mt-2 text-2xl font-semibold text-violet-200">{totalWeeks || "—"}{totalWeeks ? " wk" : ""}</div>
+                <div className="mt-1 text-xs text-zinc-600">Based on the current roadmap</div>
+              </div>
+            </div>
+
+            <div className="mt-8 grid gap-4 lg:grid-cols-3">
+              <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.04] p-5 lg:col-span-1">
+                <div className="flex items-center gap-2 text-sm font-medium text-emerald-200">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Skills you already have
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {currentSkills.length > 0 ? currentSkills.map((skill, index) => (
+                    <span key={`${skill}-${index}`} className="rounded-lg bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-200">{skill}</span>
+                  )) : <span className="text-sm text-zinc-500">No matched skills were detected yet.</span>}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/[0.04] p-5 lg:col-span-2">
+                <div className="flex items-center gap-2 text-sm font-medium text-cyan-200">
+                  <Target className="h-4 w-4" />
+                  What this opportunity expects
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {requiredSkills.length > 0 ? requiredSkills.map((skill, index) => (
+                    <span key={`${skill}-${index}`} className={`rounded-lg px-3 py-1.5 text-xs ${missingSkills.includes(skill) ? "bg-amber-400/10 text-amber-200" : "bg-cyan-400/10 text-cyan-200"}`}>{skill}</span>
+                  )) : <span className="text-sm text-zinc-500">No structured skill requirements were returned.</span>}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-amber-400/15 bg-amber-400/[0.04] p-5">
+              <div className="flex items-center gap-2 text-sm font-medium text-amber-200">
+                <AlertTriangle className="h-4 w-4" />
+                Priority skill gaps
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {missingSkills.length > 0 ? missingSkills.map((skill, index) => (
+                  <span key={`${skill}-${index}`} className="rounded-lg bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200">{skill}</span>
+                )) : <span className="text-sm text-emerald-200">No major skill gaps detected. Focus on evidence, projects and application quality.</span>}
+              </div>
+            </div>
+
+            {(preparation?.priority_actions || []).length > 0 && (
+              <div className="mt-8 rounded-2xl border border-violet-400/15 bg-violet-500/[0.04] p-5">
+                <div className="flex items-center gap-2 text-sm font-medium text-violet-200"><Sparkles className="h-4 w-4" />Start here</div>
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  {(preparation?.priority_actions || []).map((action, index) => (
+                    <div key={`${action}-${index}`} className="rounded-xl bg-black/20 p-4 text-sm leading-6 text-zinc-300">
+                      <span className="mr-2 text-violet-300">{index + 1}.</span>{action}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-10">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-2xl font-semibold">Close the gap step by step</h2>
+                  <p className="mt-2 text-sm text-zinc-500">Each phase combines learning, practice and visible portfolio evidence.</p>
+                </div>
+                {preparation?.next_action && <div className="rounded-xl bg-cyan-300/10 px-4 py-2 text-xs text-cyan-200">Next: {preparation.next_action}</div>}
+              </div>
+
+              <div className="mt-6 space-y-5">
+                {roadmap.length > 0 ? roadmap.map((item, index) => {
+                  const learning = item.steps || item.learn || item.topics || [];
+                  const practice = item.practice || [];
+                  return (
+                    <div key={`${item.skill}-${index}`} className="rounded-2xl border border-white/8 bg-white/[0.025] p-5 sm:p-6">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="text-xs uppercase tracking-wider text-zinc-500">STEP {index + 1}{item.estimated_hours ? ` • ${item.estimated_hours} hours` : ""}</div>
+                          <h3 className="mt-1 text-xl font-semibold text-cyan-100">{item.skill}</h3>
+                          {item.priority && <div className="mt-2 inline-flex rounded-full bg-violet-500/10 px-3 py-1 text-xs text-violet-200">{item.priority} priority</div>}
+                        </div>
+                        <div className="rounded-xl border border-white/8 bg-black/20 px-4 py-3 text-xs text-zinc-400">Phase {index + 1} of {roadmap.length}</div>
+                      </div>
+
+                      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+                        <div className="rounded-xl bg-black/20 p-4">
+                          <div className="text-xs uppercase tracking-wider text-cyan-200">Learn</div>
+                          <div className="mt-3 space-y-2">
+                            {learning.length > 0 ? learning.map((step, stepIndex) => <div key={`${step}-${stepIndex}`} className="flex gap-2 text-sm leading-6 text-zinc-300"><span className="text-cyan-300">{stepIndex + 1}.</span><span>{step}</span></div>) : <div className="text-sm text-zinc-500">Build the core concepts and vocabulary for {item.skill}.</div>}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-black/20 p-4">
+                          <div className="text-xs uppercase tracking-wider text-emerald-200">Practice</div>
+                          <div className="mt-3 space-y-2">
+                            {practice.length > 0 ? practice.map((step, stepIndex) => <div key={`${step}-${stepIndex}`} className="flex gap-2 text-sm leading-6 text-zinc-300"><CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-300" /><span>{step}</span></div>) : <div className="text-sm text-zinc-500">Use {item.skill} in a small hands-on task before moving on.</div>}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-cyan-300/10 bg-cyan-300/[0.04] p-4">
+                          <div className="text-xs uppercase tracking-wider text-cyan-200">Portfolio mission</div>
+                          <p className="mt-3 text-sm leading-6 text-zinc-300">{item.project || item.proof_project || `Build a practical project demonstrating ${item.skill}.`}</p>
+                          {item.success_criteria && <p className="mt-4 border-t border-white/8 pt-4 text-xs leading-5 text-zinc-500"><span className="text-zinc-400">Done when:</span> {item.success_criteria}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-8 text-center">
+                    <p className="text-sm text-zinc-400">No roadmap steps were generated.</p>
+                    <p className="mt-2 text-xs text-zinc-600">Your current profile may already cover the listed requirements. Focus on portfolio proof and application readiness.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {(preparation?.weekly_schedule || []).length > 0 && (
+              <div className="mt-10">
+                <h2 className="text-2xl font-semibold">Suggested weekly plan</h2>
+                <p className="mt-2 text-sm text-zinc-500">A simple sequence so the preparation work is actionable rather than just a list of skills.</p>
+                <div className="mt-5 grid gap-3 md:grid-cols-2">
+                  {(preparation?.weekly_schedule || []).map((week) => (
+                    <div key={week.week} className="rounded-2xl border border-white/8 bg-white/[0.025] p-5">
+                      <div className="flex items-center justify-between gap-4"><span className="text-xs uppercase tracking-wider text-violet-200">Week {week.week}</span><span className="text-xs text-zinc-500">{week.hours}h</span></div>
+                      <h3 className="mt-3 font-semibold text-white">{week.focus}</h3>
+                      <p className="mt-2 text-sm leading-6 text-zinc-400">{week.goal}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(preparation?.portfolio_actions || []).length > 0 && (
+              <div className="mt-10 rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.04] p-5">
+                <div className="flex items-center gap-2 text-sm font-medium text-emerald-200"><CheckCircle2 className="h-4 w-4" />Portfolio actions</div>
+                <div className="mt-4 space-y-2">
+                  {(preparation?.portfolio_actions || []).map((action, index) => <div key={`${action}-${index}`} className="text-sm leading-6 text-zinc-300">• {action}</div>)}
+                </div>
+              </div>
+            )}
+
+            {(deadlineInfo || applicationStrategy) && (
+              <div className="mt-10 grid gap-4 md:grid-cols-2">
+                {deadlineInfo && <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-5"><div className="text-xs uppercase tracking-wider text-zinc-500">Deadline strategy</div><div className="mt-2 text-lg font-semibold text-white">{deadlineInfo.urgency || "Review deadline"}{deadlineInfo.days_remaining !== null && deadlineInfo.days_remaining !== undefined ? ` • ${deadlineInfo.days_remaining} days remaining` : ""}</div><p className="mt-3 text-sm leading-6 text-zinc-400">{deadlineInfo.application_strategy || "Check the opportunity source for the latest deadline."}</p></div>}
+                {applicationStrategy && <div className="rounded-2xl border border-white/8 bg-white/[0.025] p-5"><div className="text-xs uppercase tracking-wider text-zinc-500">Application strategy</div><p className="mt-3 text-sm leading-6 text-zinc-400">{typeof applicationStrategy === "string" ? applicationStrategy : applicationStrategy.strategy || applicationStrategy.recommendation || applicationStrategy.application_strategy || "Use the roadmap to improve the highest-impact gaps before applying."}</p></div>}
+              </div>
+            )}
+
+          </div>
+        </section>
+      </main>
+    );
   }
 
 
@@ -1714,7 +1824,7 @@ function App() {
                       )}
 
 
-                      {(item.projects || []).length > 0 && (
+                      {((item.projects || []).length > 0 || item.proof_project) && (
 
                         <div className="mt-5">
 
@@ -1724,7 +1834,7 @@ function App() {
 
                           <div className="mt-3 grid gap-3 md:grid-cols-2">
 
-                            {(item.projects || [])
+                            {(item.projects || [item.proof_project].filter(Boolean))
                               .map(
                                 (
                                   project,
@@ -1802,6 +1912,26 @@ function App() {
             <p className="mt-3 text-sm text-zinc-400">
               Compare profile fit, source confidence and application timing before deciding where to focus.
             </p>
+
+            {comparison.length > 0 && (
+              <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  ["Best match", comparison.reduce((best, item) => item.match_score > best.match_score ? item : best, comparison[0])?.title],
+                  ["Most trusted", comparison.reduce((best, item) => item.trust_score > best.trust_score ? item : best, comparison[0])?.title],
+                  ["Most ready", comparison.reduce((best, item) => (item.readiness || 0) > (best.readiness || 0) ? item : best, comparison[0])?.title],
+                  ["Easiest to prepare", comparison.reduce((best, item) => (item.estimated_learning_hours || 0) < (best.estimated_learning_hours || 0) ? item : best, comparison[0])?.title],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl bg-white/[0.03] p-4">
+                    <div className="text-[10px] uppercase tracking-wider text-zinc-500">
+                      {label}
+                    </div>
+                    <div className="mt-2 text-sm font-medium text-zinc-200">
+                      {value || "—"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
 
             <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -2663,26 +2793,6 @@ function App() {
       </section>
 
 
-      {/* WORKSPACE */}
-
-      {workspaceOpen && (
-
-        <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">
-
-          <OpportunityWorkspace
-            data={workspace}
-            loading={workspaceLoading}
-            onClose={() => {
-              setWorkspaceOpen(false);
-              setWorkspace(null);
-            }}
-          />
-
-        </section>
-
-      )}
-
-
       {/* PROFILE INTELLIGENCE */}
 
       <section className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">
@@ -2917,7 +3027,7 @@ function App() {
 
               <input
                 type="file"
-                accept=".txt,.md"
+                accept=".pdf,.docx,.doc,.txt,.md,.rtf,.html,.htm,.json"
                 className="hidden"
                 disabled={resumeLoading}
                 onChange={(event) => {

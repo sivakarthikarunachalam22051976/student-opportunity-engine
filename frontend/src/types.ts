@@ -1,3 +1,4 @@
+
 // ============================================================
 // CORE ENUMS & REUSABLE TYPES
 // ============================================================
@@ -121,26 +122,66 @@ export type PreparationRoadmapItem = {
   priority?: string;
   steps?: string[];
   topics?: string[];
+  learn?: string[];
+  practice?: string[];
   project?: string;
+  proof_project?: string;
+  resources?: Array<Record<string, unknown>>;
+  estimated_hours?: number;
   estimated_time?: string;
 };
 
 export type PreparationResponse = {
   opportunity: string;
-  readiness_percentage: number;
-  current_skills: string[];
+  readiness_percentage?: number;
+  current_readiness?: number;
+  readiness_level?: string;
+  required_skills?: string[];
+  current_skills?: string[];
+  matched_skills?: string[];
   missing_skills: string[];
+  estimated_total_hours?: number;
+  estimated_weeks?: number;
   roadmap: PreparationRoadmapItem[];
+  weekly_schedule?: Array<{
+    week: number;
+    focus: string;
+    hours: number;
+    goal: string;
+  }>;
+  priority_actions?: string[];
+  portfolio_actions?: string[];
+  next_action?: string;
+  opportunity_details?: {
+    organization?: string;
+    location?: string;
+    remote?: boolean;
+    deadline?: string | null;
+    type?: string;
+  };
+  deadline?: {
+    urgency?: string;
+    days_remaining?: number | null;
+    application_strategy?: string;
+  };
+  application_strategy?: any;
 };
 
 export type FuturePathItem = {
+  stage?: number;
+  stage_name?: string;
   skill: string;
   goal: string;
   priority?: string;
   why_it_matters?: string;
   milestones?: string[];
+  practice?: string[];
   projects?: string[];
+  proof_project?: string;
+  success_criteria?: string;
+  career_value?: string;
   estimated_time?: string;
+  estimated_hours?: number;
 };
 
 export type FuturePathResponse = {
